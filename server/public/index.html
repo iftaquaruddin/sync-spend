@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ExpenseHub">
+  <link rel="manifest" href="/manifest.json">
+  <title>ExpenseHub Pro • Combined & User-Organized Expenses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4361EE;
+      --primary-dark: #3A0CA3;
+      --primary-light: #EEF2FF;
+      --accent: #4CC9F0;
+      --success: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 20px -2px rgba(67, 97, 238, 0.08);
+      --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 70px; }
+
+    /* Top Navigation Bar */
+    .navbar {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.15rem; color: var(--text); }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+    }
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+      padding: 4px 12px 4px 4px;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .logout-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+    .logout-btn:hover { color: var(--danger); }
+
+    .wifi-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+    }
+    .wifi-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+
+    .container { max-width: 680px; margin: 0 auto; padding: 16px; }
+
+    /* Auth Card */
+    .auth-container {
+      max-width: 420px;
+      margin: 40px auto;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+    }
+    .auth-header { text-align: center; margin-bottom: 24px; }
+    .auth-header h2 { font-size: 1.4rem; font-weight: 800; color: var(--text); }
+    .auth-header p { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+    .auth-tabs { display: flex; background: var(--bg); border-radius: var(--radius-md); padding: 4px; margin-bottom: 20px; }
+    .auth-tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.2s;
+    }
+    .auth-tab.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
+
+    /* Scope Filter Bar (Combined vs Personal vs User) */
+    .scope-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      margin-bottom: 8px;
+      scrollbar-width: none;
+    }
+    .scope-bar::-webkit-scrollbar { display: none; }
+    .scope-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      padding: 7px 14px;
+      border-radius: 30px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .scope-pill:hover { border-color: var(--primary); color: var(--primary); }
+    .scope-pill.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(67, 97, 238, 0.25);
+    }
+    .scope-pill-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+    }
+
+    /* Executive Hero Card */
+    .hero-card {
+      background: linear-gradient(135deg, #1E1B4B, #312E81, #4338CA);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      color: white;
+      box-shadow: 0 10px 25px -5px rgba(49, 46, 129, 0.4);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-card::after {
+      content: '';
+      position: absolute;
+      right: -30px;
+      bottom: -30px;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+      border-radius: 50%;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .hero-amount { font-size: 2.3rem; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 16px; }
+    .hero-metrics { display: flex; gap: 16px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 14px; }
+    .hero-metric { flex: 1; }
+    .hero-metric span { font-size: 0.72rem; color: #C7D2FE; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; display: block; }
+    .hero-metric strong { font-size: 1.05rem; font-weight: 700; color: white; margin-top: 2px; display: block; }
+
+    /* Segmented Navigation */
+    .nav-tabs {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .nav-tab {
+      flex: 1;
+      padding: 10px 12px;
+      border: none;
+      background: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .nav-tab.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(67, 97, 238, 0.25); }
+
+    /* Surface Card */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    /* Form Styles */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 0.95rem;
+      outline: none;
+      background: #FAFAFA;
+      transition: all 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+    }
+
+    .amount-input-wrapper { position: relative; display: flex; align-items: center; }
+    .currency-symbol { position: absolute; left: 16px; font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+    .amount-input { padding-left: 36px !important; font-size: 1.4rem !important; font-weight: 800 !important; color: var(--text) !important; letter-spacing: -0.5px; }
+
+    .quick-amount-chips { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .chip {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid rgba(67, 97, 238, 0.2);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover, .chip:active { background: var(--primary); color: white; }
+
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(67, 97, 238, 0.3);
+      transition: transform 0.1s, box-shadow 0.2s;
+      margin-top: 8px;
+    }
+    .btn-submit:active { transform: scale(0.98); }
+
+    /* User Breakdown Cards */
+    .user-stat-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      background: #FAFAFA;
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .user-stat-card:hover { border-color: var(--primary); background: #F8FAFC; }
+    .user-stat-left { display: flex; align-items: center; gap: 12px; }
+    .user-stat-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .user-stat-info h4 { font-size: 0.92rem; font-weight: 700; }
+    .user-stat-info p { font-size: 0.75rem; color: var(--text-muted); }
+    .user-stat-right { text-align: right; }
+    .user-stat-amount { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+    .user-stat-pct { font-size: 0.75rem; font-weight: 600; color: var(--primary); }
+
+    /* Category Analytics */
+    .cat-bar-item { margin-bottom: 14px; }
+    .cat-bar-header { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    .cat-bar-track { height: 8px; background: #F1F5F9; border-radius: 10px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; border-radius: 10px; transition: width 0.4s ease; }
+
+    /* Transactions List */
+    .search-bar { margin-bottom: 14px; display: flex; gap: 8px; }
+    .search-input { flex: 1; padding: 10px 14px; font-size: 0.88rem; }
+    .filter-select { width: 140px; padding: 10px 12px; font-size: 0.88rem; }
+
+    .expense-list { list-style: none; }
+    .expense-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .expense-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .item-left { display: flex; align-items: center; gap: 14px; }
+    .item-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+    .item-details h4 { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .item-meta { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; flex-wrap: wrap; }
+    .user-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 1px 7px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .item-right { text-align: right; }
+    .item-amount { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+    .item-delete {
+      background: none;
+      border: none;
+      color: #CBD5E1;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-left: 8px;
+      transition: color 0.2s;
+    }
+    .item-delete:hover { color: var(--danger); }
+
+    .empty-state { text-align: center; padding: 36px 16px; color: var(--text-muted); }
+    .empty-icon { font-size: 2.8rem; margin-bottom: 8px; display: block; opacity: 0.7; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1E293B;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      z-index: 100;
+      display: none;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">💸</div>
+      <span>ExpenseHub</span>
+    </div>
+    <div id="nav-user-container" style="display: flex; align-items: center; gap: 8px;">
+      <div class="wifi-status" id="wifi-indicator">
+        <div class="wifi-dot"></div>
+        <span id="wifi-label">10.0.0.184</span>
+      </div>
+      <div class="user-pill" id="user-profile-pill" style="display: none;">
+        <div class="user-avatar" id="nav-user-avatar">A</div>
+        <span id="nav-username">Alex</span>
+        <button class="logout-btn" onclick="logout()" title="Log Out">⏻</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Area -->
+  <div class="container">
+
+    <!-- 1. AUTH SCREEN -->
+    <div id="auth-view" class="auth-container">
+      <div class="auth-header">
+        <h2>Welcome to ExpenseHub</h2>
+        <p>Private multi-user expense tracking on local Wi-Fi</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" placeholder="e.g. admin or username" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-submit" id="btn-login">Sign In</button>
+        <p style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 14px;">
+          Default demo account: <strong>admin</strong> / <strong>admin123</strong>
+        </p>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" style="display: none;">
+        <div class="form-group">
+          <label for="reg-fullname">Your Full Name</label>
+          <input type="text" id="reg-fullname" placeholder="e.g. Sarah Connor" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-username">Choose Username</label>
+          <input type="text" id="reg-username" placeholder="e.g. sarah" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Choose Password</label>
+          <input type="password" id="reg-password" placeholder="At least 4 characters" required minlength="4" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn-submit" id="btn-register">Create Account</button>
+      </form>
+    </div>
+
+    <!-- 2. DASHBOARD VIEW -->
+    <div id="dashboard-view" style="display: none;">
+
+      <!-- Scope Switcher Bar (Organized by Users & Combined) -->
+      <div class="scope-bar" id="scope-bar">
+        <button class="scope-pill active" id="scope-all" onclick="setScope('all')">
+          <span>👥 Combined (All Users)</span>
+        </button>
+        <button class="scope-pill" id="scope-me" onclick="setScope('me')">
+          <span>👤 My Expenses</span>
+        </button>
+        <!-- Populated dynamically with each registered user -->
+        <span id="user-pills-container" style="display: flex; gap: 8px;"></span>
+      </div>
+
+      <!-- Executive Hero Card -->
+      <div class="hero-card">
+        <div class="hero-badge" id="hero-scope-badge">👥 COMBINED EXPENSES</div>
+        <div class="hero-amount" id="hero-total">$0.00</div>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <span>This Month</span>
+            <strong id="hero-month">$0.00</strong>
+          </div>
+          <div class="hero-metric">
+            <span>Today</span>
+            <strong id="hero-today">$0.00</strong>
+          </div>
+          <div class="hero-metric">
+            <span>Transactions</span>
+            <strong id="hero-count">0</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-btn-add" onclick="switchDashboardTab('add')">
+          <span>➕</span> Add
+        </button>
+        <button class="nav-tab" id="tab-btn-history" onclick="switchDashboardTab('history')">
+          <span>📋</span> Transactions
+        </button>
+        <button class="nav-tab" id="tab-btn-users" onclick="switchDashboardTab('users')">
+          <span>👥</span> By User
+        </button>
+        <button class="nav-tab" id="tab-btn-insights" onclick="switchDashboardTab('insights')">
+          <span>📊</span> Insights
+        </button>
+      </div>
+
+      <!-- Tab 1: Add Expense Form -->
+      <div id="subview-add" class="card">
+        <div class="card-title">
+          <span>Record New Expense</span>
+        </div>
+        <form id="expense-form">
+          <div class="form-group">
+            <label for="amount">Amount ($)</label>
+            <div class="amount-input-wrapper">
+              <span class="currency-symbol">$</span>
+              <input type="number" step="0.01" min="0.01" id="amount" class="amount-input" placeholder="0.00" required>
+            </div>
+            <div class="quick-amount-chips">
+              <span class="chip" onclick="setQuickAmount(5)">+$5</span>
+              <span class="chip" onclick="setQuickAmount(10)">+$10</span>
+              <span class="chip" onclick="setQuickAmount(25)">+$25</span>
+              <span class="chip" onclick="setQuickAmount(50)">+$50</span>
+              <span class="chip" onclick="setQuickAmount(100)">+$100</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="title">Title / Merchant</label>
+            <input type="text" id="title" placeholder="e.g. Grocery, Starbucks, Shell Petrol" required>
+            <div class="quick-amount-chips">
+              <span class="chip" onclick="setQuickTitle('Lunch')">Lunch</span>
+              <span class="chip" onclick="setQuickTitle('Coffee')">Coffee</span>
+              <span class="chip" onclick="setQuickTitle('Groceries')">Groceries</span>
+              <span class="chip" onclick="setQuickTitle('Fuel')">Fuel</span>
+              <span class="chip" onclick="setQuickTitle('Dinner')">Dinner</span>
+              <span class="chip" onclick="setQuickTitle('Uber')">Uber</span>
+            </div>
+          </div>
+
+          <div class="form-row" style="display: flex; gap: 12px;">
+            <div class="form-group" style="flex: 1;">
+              <label for="category">Category</label>
+              <select id="category">
+                <option value="Food & Dining">🍔 Food & Dining</option>
+                <option value="Groceries">🛒 Groceries</option>
+                <option value="Transport">🚗 Transport</option>
+                <option value="Shopping">🛍️ Shopping</option>
+                <option value="Bills & Utilities">💡 Bills & Utilities</option>
+                <option value="Entertainment">🎬 Entertainment</option>
+                <option value="Health">💊 Health</option>
+                <option value="Travel">✈️ Travel</option>
+                <option value="Other">📦 Other</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="date">Date</label>
+              <input type="date" id="date" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Notes (optional)</label>
+            <input type="text" id="notes" placeholder="Invoice #, location, or details">
+          </div>
+
+          <button type="submit" class="btn-submit" id="btn-save-expense">
+            Save to Local Server
+          </button>
+        </form>
+      </div>
+
+      <!-- Tab 2: Transaction History -->
+      <div id="subview-history" class="card" style="display: none;">
+        <div class="card-title">
+          <span id="history-header-title">Transactions</span>
+          <button onclick="loadUserData()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-weight:700;font-size:0.85rem;">↻ Refresh</button>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="search-input" class="search-input" placeholder="🔍 Search description or user..." oninput="filterTransactions()">
+          <select id="filter-category" class="filter-select" onchange="filterTransactions()">
+            <option value="All">All Categories</option>
+            <option value="Food & Dining">🍔 Food & Dining</option>
+            <option value="Groceries">🛒 Groceries</option>
+            <option value="Transport">🚗 Transport</option>
+            <option value="Shopping">🛍️ Shopping</option>
+            <option value="Bills & Utilities">💡 Bills</option>
+            <option value="Entertainment">🎬 Entertainment</option>
+            <option value="Health">💊 Health</option>
+            <option value="Travel">✈️ Travel</option>
+            <option value="Other">📦 Other</option>
+          </select>
+        </div>
+
+        <ul class="expense-list" id="transactions-list"></ul>
+      </div>
+
+      <!-- Tab 3: Organized by Users -->
+      <div id="subview-users" class="card" style="display: none;">
+        <div class="card-title">
+          <span>Expenses Organized by User</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
+          Spending breakdown across all household/team members. Tap any member to view their individual transactions.
+        </p>
+        <div id="users-breakdown-container"></div>
+      </div>
+
+      <!-- Tab 4: Insights & Analytics -->
+      <div id="subview-insights" class="card" style="display: none;">
+        <div class="card-title">
+          <span>Category Breakdown</span>
+        </div>
+        <div id="category-bars-container"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const categoryIcons = {
+      'Food & Dining': { icon: '🍔', color: '#F97316', bg: '#FFF7ED' },
+      'Groceries': { icon: '🛒', color: '#10B981', bg: '#ECFDF5' },
+      'Transport': { icon: '🚗', color: '#3B82F6', bg: '#EFF6FF' },
+      'Shopping': { icon: '🛍️', color: '#8B5CF6', bg: '#F5F3FF' },
+      'Bills & Utilities': { icon: '💡', color: '#EF4444', bg: '#FEF2F2' },
+      'Entertainment': { icon: '🎬', color: '#F59E0B', bg: '#FFFBEB' },
+      'Health': { icon: '💊', color: '#14B8A6', bg: '#F0FDFA' },
+      'Travel': { icon: '✈️', color: '#06B6D4', bg: '#ECFEFF' },
+      'Other': { icon: '📦', color: '#64748B', bg: '#F8FAFC' }
+    };
+
+    let currentUser = null;
+    let currentToken = localStorage.getItem('eh_token') || null;
+    let currentScope = 'all'; // 'all' (combined), 'me', or userId number
+    let allUsers = [];
+    let allExpenses = [];
+
+    // Initialize date
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+    async function initServerInfo() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        const primaryIp = (data.ips && data.ips.length) ? data.ips[0] : window.location.hostname;
+        document.getElementById('wifi-label').innerText = `${primaryIp}:${window.location.port || 3000}`;
+      } catch (e) {
+        document.getElementById('wifi-label').innerText = window.location.host;
+      }
+    }
+
+    function switchAuthTab(type) {
+      if (type === 'login') {
+        document.getElementById('tab-login').classList.add('active');
+        document.getElementById('tab-register').classList.remove('active');
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('register-form').style.display = 'none';
+      } else {
+        document.getElementById('tab-register').classList.add('active');
+        document.getElementById('tab-login').classList.remove('active');
+        document.getElementById('register-form').style.display = 'block';
+        document.getElementById('login-form').style.display = 'none';
+      }
+    }
+
+    function switchDashboardTab(tab) {
+      ['add', 'history', 'users', 'insights'].forEach(t => {
+        document.getElementById(`subview-${t}`).style.display = (t === tab) ? 'block' : 'none';
+        document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
+      });
+      if (tab === 'history') filterTransactions();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2400);
+    }
+
+    function setQuickAmount(add) {
+      const amtInput = document.getElementById('amount');
+      const curr = parseFloat(amtInput.value) || 0;
+      amtInput.value = (curr + add).toFixed(2);
+    }
+    function setQuickTitle(val) {
+      document.getElementById('title').value = val;
+    }
+
+    // Set Scope: 'all', 'me', or userId number
+    function setScope(scope) {
+      currentScope = scope;
+
+      // Update pill active states
+      document.querySelectorAll('.scope-pill').forEach(el => el.classList.remove('active'));
+      if (scope === 'all') document.getElementById('scope-all').classList.add('active');
+      else if (scope === 'me') document.getElementById('scope-me').classList.add('active');
+      else {
+        const uPill = document.getElementById(`scope-user-${scope}`);
+        if (uPill) uPill.classList.add('active');
+      }
+
+      // Update badge label
+      if (scope === 'all') {
+        document.getElementById('hero-scope-badge').innerText = '👥 COMBINED EXPENSES';
+        document.getElementById('history-header-title').innerText = 'Combined Transactions';
+      } else if (scope === 'me') {
+        document.getElementById('hero-scope-badge').innerText = '👤 MY PERSONAL EXPENSES';
+        document.getElementById('history-header-title').innerText = 'My Transactions';
+      } else {
+        const target = allUsers.find(u => u.id == scope);
+        document.getElementById('hero-scope-badge').innerText = `👤 ${target ? target.fullName.toUpperCase() : 'USER'} EXPENSES`;
+        document.getElementById('history-header-title').innerText = `${target ? target.fullName : 'User'} Transactions`;
+      }
+
+      loadUserData();
+    }
+
+    // Login Form Submit
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentToken = data.token;
+          currentUser = data.user;
+          localStorage.setItem('eh_token', currentToken);
+          localStorage.setItem('eh_user', JSON.stringify(currentUser));
+          renderAuthenticated();
+        } else {
+          alert(data.error || 'Failed to sign in');
+        }
+      } catch (err) {
+        alert('Network error connecting to local server');
+      }
+    });
+
+    // Register Form Submit
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fullName = document.getElementById('reg-fullname').value.trim();
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName, username, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentToken = data.token;
+          currentUser = data.user;
+          localStorage.setItem('eh_token', currentToken);
+          localStorage.setItem('eh_user', JSON.stringify(currentUser));
+          renderAuthenticated();
+        } else {
+          alert(data.error || 'Registration failed');
+        }
+      } catch (err) {
+        alert('Network error connecting to local server');
+      }
+    });
+
+    function logout() {
+      currentToken = null;
+      currentUser = null;
+      localStorage.removeItem('eh_token');
+      localStorage.removeItem('eh_user');
+      document.getElementById('auth-view').style.display = 'block';
+      document.getElementById('dashboard-view').style.display = 'none';
+      document.getElementById('user-profile-pill').style.display = 'none';
+    }
+
+    async function renderAuthenticated() {
+      if (!currentToken) return;
+
+      document.getElementById('auth-view').style.display = 'none';
+      document.getElementById('dashboard-view').style.display = 'block';
+      document.getElementById('user-profile-pill').style.display = 'flex';
+
+      const cachedUser = currentUser || JSON.parse(localStorage.getItem('eh_user') || '{}');
+      if (cachedUser.fullName) {
+        document.getElementById('nav-username').innerText = cachedUser.fullName;
+        document.getElementById('nav-user-avatar').innerText = (cachedUser.fullName[0] || 'U').toUpperCase();
+        if (cachedUser.avatarColor) {
+          document.getElementById('nav-user-avatar').style.backgroundColor = cachedUser.avatarColor;
+        }
+      }
+
+      await loadUserData();
+    }
+
+    // Load data based on current scope
+    async function loadUserData() {
+      if (!currentToken) return;
+      try {
+        const [usersRes, expRes, sumRes] = await Promise.all([
+          fetch('/api/users', { headers: { 'Authorization': `Bearer ${currentToken}` } }),
+          fetch(`/api/expenses?userId=${currentScope}`, { headers: { 'Authorization': `Bearer ${currentToken}` } }),
+          fetch(`/api/summary?userId=${currentScope}`, { headers: { 'Authorization': `Bearer ${currentToken}` } })
+        ]);
+
+        if (expRes.status === 401 || expRes.status === 403) {
+          logout();
+          return;
+        }
+
+        allUsers = await usersRes.json();
+        allExpenses = await expRes.json();
+        const summary = await sumRes.json();
+
+        // Render user scope pills in header
+        renderUserPills();
+
+        // Update hero metrics
+        document.getElementById('hero-total').innerText = `$${(summary.totalSpent || 0).toFixed(2)}`;
+        document.getElementById('hero-month').innerText = `$${(summary.thisMonthSpent || 0).toFixed(2)}`;
+        document.getElementById('hero-today').innerText = `$${(summary.todaySpent || 0).toFixed(2)}`;
+        document.getElementById('hero-count').innerText = summary.totalCount || 0;
+
+        filterTransactions();
+        renderUsersBreakdown(summary.byUser || allUsers);
+        renderInsights(summary.byCategory);
+      } catch (err) {
+        console.error('Error loading data:', err);
+      }
+    }
+
+    function renderUserPills() {
+      const container = document.getElementById('user-pills-container');
+      container.innerHTML = allUsers.map(u => {
+        const isActive = (currentScope == u.id);
+        const initial = (u.fullName || u.username)[0].toUpperCase();
+        return `
+          <button class="scope-pill ${isActive ? 'active' : ''}" id="scope-user-${u.id}" onclick="setScope(${u.id})">
+            <span class="scope-pill-avatar" style="background:${u.avatarColor || '#4361EE'}">${initial}</span>
+            <span>${escapeHtml(u.fullName)}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderUsersBreakdown(usersList) {
+      const container = document.getElementById('users-breakdown-container');
+      if (!usersList || usersList.length === 0) {
+        container.innerHTML = `<div class="empty-state"><p>No users found</p></div>`;
+        return;
+      }
+
+      container.innerHTML = usersList.map(u => {
+        const initial = (u.fullName || u.username)[0].toUpperCase();
+        const color = u.avatarColor || '#4361EE';
+        const total = (u.total !== undefined) ? u.total : (u.totalSpent || 0);
+        const count = (u.count !== undefined) ? u.count : (u.expenseCount || 0);
+        const pct = u.percentage || 0;
+
+        return `
+          <div class="user-stat-card" onclick="setScope(${u.userId || u.id})">
+            <div class="user-stat-left">
+              <div class="user-stat-avatar" style="background: ${color};">
+                ${initial}
+              </div>
+              <div class="user-stat-info">
+                <h4>${escapeHtml(u.fullName || u.username)}</h4>
+                <p>@${escapeHtml(u.username)} • ${count} expense${count === 1 ? '' : 's'}</p>
+              </div>
+            </div>
+            <div class="user-stat-right">
+              <div class="user-stat-amount">$${parseFloat(total).toFixed(2)}</div>
+              <div class="user-stat-pct">${pct}% of combined</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterTransactions() {
+      const q = (document.getElementById('search-input').value || '').toLowerCase();
+      const cat = document.getElementById('filter-category').value;
+
+      const filtered = allExpenses.filter(e => {
+        const matchesQuery = e.title.toLowerCase().includes(q) || 
+                             (e.notes && e.notes.toLowerCase().includes(q)) ||
+                             (e.full_name && e.full_name.toLowerCase().includes(q));
+        const matchesCat = (cat === 'All') || (e.category === cat);
+        return matchesQuery && matchesCat;
+      });
+
+      const listEl = document.getElementById('transactions-list');
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon">🧾</span>
+            <p>No transactions found</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => {
+        const catConfig = categoryIcons[item.category] || { icon: '📦', color: '#64748B', bg: '#F1F5F9' };
+        const userColor = item.avatar_color || '#4361EE';
+        const userName = item.full_name || item.username || 'User';
+
+        return `
+          <li class="expense-item">
+            <div class="item-left">
+              <div class="item-icon" style="background: ${catConfig.bg}; color: ${catConfig.color};">
+                ${catConfig.icon}
+              </div>
+              <div class="item-details">
+                <h4>${escapeHtml(item.title)}</h4>
+                <div class="item-meta">
+                  <span class="user-tag" style="background: ${userColor}20; color: ${userColor};">
+                    👤 ${escapeHtml(userName)}
+                  </span>
+                  <span>• ${item.date} • ${escapeHtml(item.category)}</span>
+                  ${item.notes ? '<span>• ' + escapeHtml(item.notes) + '</span>' : ''}
+                </div>
+              </div>
+            </div>
+            <div class="item-right" style="display: flex; align-items: center;">
+              <span class="item-amount">$${parseFloat(item.amount).toFixed(2)}</span>
+              <button class="item-delete" onclick="deleteExpense(${item.id})" title="Delete">✕</button>
+            </div>
+          </li>
+        `;
+      }).join('');
+    }
+
+    function renderInsights(categories) {
+      const container = document.getElementById('category-bars-container');
+      if (!categories || categories.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon">📊</span>
+            <p>Add expenses to view category insights</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = categories.map(cat => {
+        const catConfig = categoryIcons[cat.category] || { icon: '📦', color: '#64748B' };
+        return `
+          <div class="cat-bar-item">
+            <div class="cat-bar-header">
+              <span>${catConfig.icon} ${escapeHtml(cat.category)} (${cat.count})</span>
+              <span>$${parseFloat(cat.total).toFixed(2)} (${cat.percentage}%)</span>
+            </div>
+            <div class="cat-bar-track">
+              <div class="cat-bar-fill" style="width: ${cat.percentage}%; background: ${catConfig.color};"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Save Expense Form
+    document.getElementById('expense-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const title = document.getElementById('title').value.trim();
+      const category = document.getElementById('category').value;
+      const date = document.getElementById('date').value;
+      const notes = document.getElementById('notes').value.trim();
+
+      try {
+        const res = await fetch('/api/expenses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify({ amount, title, category, date, notes })
+        });
+
+        if (res.ok) {
+          showToast('Expense recorded! ✨');
+          document.getElementById('amount').value = '';
+          document.getElementById('title').value = '';
+          document.getElementById('notes').value = '';
+          await loadUserData();
+          switchDashboardTab('history');
+        } else {
+          const err = await res.json();
+          alert(err.error || 'Failed to save expense');
+        }
+      } catch (err) {
+        alert('Network error connecting to local server');
+      }
+    });
+
+    async function deleteExpense(id) {
+      if (!confirm('Are you sure you want to delete this expense?')) return;
+      try {
+        const res = await fetch(`/api/expenses/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          showToast('Expense removed');
+          loadUserData();
+        } else {
+          const err = await res.json();
+          alert(err.error || 'Failed to delete expense');
+        }
+      } catch (e) {
+        alert('Error deleting expense');
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    }
+
+    // Initialize
+    initServerInfo();
+    if (currentToken) {
+      renderAuthenticated();
+    }
+  </script>
+</body>
+</html>
