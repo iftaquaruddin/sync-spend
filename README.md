@@ -1,17 +1,22 @@
 # 💸 SyncSpend
 
-[![Release](https://img.shields.io/badge/Release-v1.0.0-4361EE.svg)](https://github.com)
+[![Release](https://img.shields.io/badge/Release-v1.1.0-4361EE.svg)](https://github.com)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Tesseract OCR](https://img.shields.io/badge/OCR-Tesseract.js-5c6bc0?logo=thealgorithms&logoColor=white)](https://github.com/naptha/tesseract.js)
 [![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **A privacy-first, multi-user expense tracking system that connects mobile phones (Android & iPhone) to your local server over Wi-Fi. Features both combined household/team totals and individual member ledgers with no cloud accounts or subscriptions required.**
+> **A privacy-first, multi-user expense tracking system that connects mobile phones (Android & iPhone) to your local server over Wi-Fi. Features intelligent OCR bill scanning, combined household/team totals, and individual member ledgers with no cloud accounts or subscriptions required.**
 
 ---
 
 ## 🌟 Highlights
 
+- **📸 Smart OCR Bill & Receipt Scanner**:
+  - Snap a photo of any receipt or upload a bill to auto-extract amount, merchant/title, date, and category.
+  - Powered by embedded WebAssembly Tesseract OCR — runs locally on your private server.
+  - Pre-fills the form with high confidence; review or edit with one tap before submitting.
 - **👥 Combined & User-Organized Ledgers**:
   - **Combined (All Users)**: View unified household/team totals, monthly spending, and category distribution.
   - **Personal Ledgers**: View personal spending or filter by any specific member with one tap.

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -657,6 +658,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _searchController = TextEditingController();
   String _historyCategoryFilter = 'All';
 
+  // OCR Receipt Scanning State
+  bool _isOcrScanning = false;
+  String? _ocrSuccessMsg;
+
   // Categories config
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Food & Dining', 'icon': Icons.restaurant, 'color': const Color(0xFFF97316)},
@@ -840,6 +845,138 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {
       return const Color(0xFF4361EE);
     }
+  }
+
+  Future<void> _pickAndScanReceipt(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source, imageQuality: 85);
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isOcrScanning = true;
+        _ocrSuccessMsg = null;
+      });
+
+      final bytes = await pickedFile.readAsBytes();
+      final uri = Uri.parse('${widget.serverUrl}/api/ocr/scan');
+
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll({
+        'Authorization': 'Bearer ${widget.token}',
+      });
+      request.files.add(http.MultipartFile.fromBytes(
+        'receipt',
+        bytes,
+        filename: pickedFile.name,
+      ));
+
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 40));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final extracted = data['extracted'];
+          final double amt = (extracted['amount'] is num) ? (extracted['amount'] as num).toDouble() : 0.0;
+          final String title = extracted['title'] ?? 'Scanned Receipt';
+          final String cat = extracted['category'] ?? 'General';
+          final String dateStr = extracted['date'] ?? '';
+          final int conf = extracted['confidence'] ?? 0;
+
+          if (amt > 0) {
+            _amountController.text = amt.toStringAsFixed(2);
+          }
+          if (title.isNotEmpty) {
+            _titleController.text = title;
+          }
+          if (_categories.any((c) => c['name'] == cat)) {
+            _selectedCategory = cat;
+          }
+          if (dateStr.isNotEmpty) {
+            final parsedDate = DateTime.tryParse(dateStr);
+            if (parsedDate != null) _selectedDate = parsedDate;
+          }
+          _notesController.text = 'OCR Scanned Receipt ($conf% match)';
+
+          setState(() {
+            _ocrSuccessMsg = '✨ Extracted: $title (\$$amt) • $conf% confidence';
+          });
+          _showToast('Receipt scanned: \$$amt ($title)!');
+        } else {
+          _showToast(data['error'] ?? 'OCR could not parse receipt', isError: true);
+        }
+      } else {
+        _showToast('OCR scan failed: ${response.statusCode}', isError: true);
+      }
+    } catch (_) {
+      _showToast('Failed to scan receipt image', isError: true);
+    } finally {
+      if (mounted) setState(() => _isOcrScanning = false);
+    }
+  }
+
+  void _showScanOptionsModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Scan Bill / Receipt (OCR)',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Capture receipt to auto-extract amount, merchant, and date.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: Color(0xFF4361EE)),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Snap receipt directly with camera', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndScanReceipt(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 6),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library, color: Color(0xFF10B981)),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Select a saved receipt or invoice screenshot', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndScanReceipt(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _getScopeLabel() {
@@ -1123,6 +1260,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 18),
+
+          // Smart Receipt Scanner Card
+          Card(
+            color: const Color(0xFFF8FAFC),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: const Color(0xFF4361EE).withValues(alpha: 0.25), width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.document_scanner, color: Color(0xFF4361EE), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Smart Receipt Scanner',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            Text(
+                              'Snap receipt or bill to auto-fill details',
+                              style: TextStyle(color: Colors.grey, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isOcrScanning)
+                        const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          onPressed: _showScanOptionsModal,
+                          icon: const Icon(Icons.camera_alt, size: 16),
+                          label: const Text('Scan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4361EE),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_isOcrScanning) ...[
+                    const SizedBox(height: 10),
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 6),
+                    const Center(
+                      child: Text(
+                        'Processing receipt image with OCR engine...',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF4361EE), fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ],
+                  if (_ocrSuccessMsg != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Color(0xFF059669), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _ocrSuccessMsg!,
+                              style: const TextStyle(color: Color(0xFF065F46), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _ocrSuccessMsg = null),
+                            child: const Icon(Icons.close, size: 14, color: Color(0xFF059669)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // Amount Card Input
           Card(

@@ -180,3 +180,31 @@ This document details all REST API endpoints available in the SyncSpend server.
     ]
   }
   ```
+
+---
+
+## 5. OCR Bill & Receipt Scanning
+
+### Scan Bill or Receipt Image
+- **Method**: `POST`
+- **Endpoint**: `/api/ocr/scan`
+- **Access**: Authenticated
+- **Content-Type**: `multipart/form-data` (with file field `receipt` or `image`) OR `application/json` (with base64 string `imageBase64`)
+- **Query / Form Parameters**:
+  - `autoSave`: `true` | `false` (optional, default `false`). If `true`, immediately persists the extracted expense under the authenticated user.
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Receipt processed successfully",
+    "extracted": {
+      "title": "Starbucks Coffee",
+      "amount": 14.85,
+      "category": "Food & Dining",
+      "date": "2026-11-05",
+      "confidence": 88
+    },
+    "autoSaved": false,
+    "rawTextSnippet": "STARBUCKS #1024\nDATE: 11/05/2026\nCARAMEL MACCHIATO 6.25\n..."
+  }
+  ```

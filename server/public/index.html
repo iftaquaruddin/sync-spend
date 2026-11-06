@@ -305,6 +305,80 @@
     }
     .chip:hover, .chip:active { background: var(--primary); color: white; }
 
+    /* OCR Scanner Banner */
+    .ocr-banner {
+      background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+      border: 1.5px dashed #818CF8;
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      transition: all 0.2s;
+    }
+    .ocr-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .ocr-icon {
+      font-size: 1.8rem;
+      background: white;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .ocr-text { flex: 1; }
+    .ocr-text h4 { font-size: 0.95rem; font-weight: 700; color: #1E1B4B; }
+    .ocr-text p { font-size: 0.75rem; color: #4338CA; margin-top: 2px; }
+    .ocr-btn {
+      background: #4361EE;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(67, 97, 238, 0.2);
+    }
+    .ocr-loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #A5B4FC;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #3730A3;
+    }
+    .ocr-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #C7D2FE;
+      border-top-color: #4361EE;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ocr-success-badge {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #065F46;
+    }
+
     .btn-submit {
       width: 100%;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -562,6 +636,28 @@
         <div class="card-title">
           <span>Record New Expense</span>
         </div>
+
+        <!-- OCR Scan Banner -->
+        <div class="ocr-banner" id="ocr-banner">
+          <input type="file" id="receipt-file-input" accept="image/*" capture="environment" style="display: none;" onchange="handleReceiptUpload(this)">
+          <div class="ocr-content" onclick="document.getElementById('receipt-file-input').click()">
+            <div class="ocr-icon">📸</div>
+            <div class="ocr-text">
+              <h4>Scan Receipt / Bill with OCR</h4>
+              <p>Take a picture to auto-extract amount, merchant, date & category</p>
+            </div>
+            <button type="button" class="ocr-btn">Scan</button>
+          </div>
+          <div class="ocr-loading" id="ocr-loading" style="display: none;">
+            <div class="ocr-spinner"></div>
+            <span>Analyzing receipt & extracting fields... Please wait</span>
+          </div>
+          <div class="ocr-success-badge" id="ocr-success-badge" style="display: none;">
+            <span id="ocr-badge-text">✨ Extracted: Walmart ($26.60)</span>
+            <button type="button" onclick="clearOcrBadge()" style="background:none;border:none;color:#065F46;cursor:pointer;font-weight:bold;margin-left:8px;">✕</button>
+          </div>
+        </div>
+
         <form id="expense-form">
           <div class="form-group">
             <label for="amount">Amount ($)</label>
@@ -1021,6 +1117,56 @@
           </div>
         `;
       }).join('');
+    }
+
+    async function handleReceiptUpload(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      
+      const loadingEl = document.getElementById('ocr-loading');
+      const badgeEl = document.getElementById('ocr-success-badge');
+      const badgeText = document.getElementById('ocr-badge-text');
+
+      loadingEl.style.display = 'flex';
+      badgeEl.style.display = 'none';
+
+      try {
+        const formData = new FormData();
+        formData.append('receipt', file);
+
+        const res = await fetch('/api/ocr/scan', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` },
+          body: formData
+        });
+
+        const data = await res.json();
+        loadingEl.style.display = 'none';
+
+        if (res.ok && data.success) {
+          const ex = data.extracted;
+          if (ex.amount > 0) document.getElementById('amount').value = ex.amount.toFixed(2);
+          if (ex.title) document.getElementById('title').value = ex.title;
+          if (ex.category) document.getElementById('category').value = ex.category;
+          if (ex.date) document.getElementById('date').value = ex.date;
+          document.getElementById('notes').value = `Scanned receipt${ex.confidence ? ' (' + ex.confidence + '% match)' : ''}`;
+
+          badgeText.innerText = `✨ Extracted: ${ex.title} ($${ex.amount}) • ${ex.confidence || 0}% match`;
+          badgeEl.style.display = 'flex';
+          showToast(`Receipt scanned: $${ex.amount} (${ex.title})!`);
+        } else {
+          alert(data.error || 'Failed to scan receipt image');
+        }
+      } catch (err) {
+        loadingEl.style.display = 'none';
+        alert('Network error connecting to local OCR server');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    function clearOcrBadge() {
+      document.getElementById('ocr-success-badge').style.display = 'none';
     }
 
     // Save Expense Form

@@ -6,14 +6,24 @@ const os = require('os');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const Tesseract = require('tesseract.js');
+const { parseReceiptText } = require('./receipt-parser.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'expense-tracker-local-wifi-secret-key-2026';
 
+// Multer memory storage for receipt image uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 } // 15MB max image upload
+});
+
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database setup
@@ -118,7 +128,6 @@ app.post('/api/auth/register', (req, res) => {
     const cleanUsername = username.trim().toLowerCase();
     const cleanFullName = (fullName && fullName.trim()) ? fullName.trim() : cleanUsername;
 
-    // Check if username taken
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(cleanUsername);
     if (existing) {
       return res.status(409).json({ error: 'Username already taken. Please choose another.' });
@@ -211,7 +220,7 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
   }
 });
 
-// 4. Get list of all users with individual spending summaries (For user filtering and comparisons)
+// 4. Get list of all users with individual spending summaries
 app.get('/api/users', authenticateToken, (req, res) => {
   try {
     const users = db.prepare(`
@@ -255,7 +264,9 @@ app.get('/api/health', (req, res) => {
 
     res.json({
       status: 'ok',
-      appName: 'ExpenseHub Pro Multiuser Server',
+      appName: 'SyncSpend Pro Multiuser OCR Server',
+      version: '1.1.0',
+      ocrEnabled: true,
       serverTime: new Date().toISOString(),
       userCount,
       expenseCount,
@@ -266,9 +277,69 @@ app.get('/api/health', (req, res) => {
   }
 });
 
-// --- EXPENSES ROUTES (Supports both COMBINED and ORGANIZED BY USER) ---
+// --- OCR BILL / RECEIPT SCANNING ROUTE ---
+// 5. OCR Scan Receipt / Bill
+// Accepts multipart image file 'receipt' or JSON body { imageBase64: '...' }
+app.post('/api/ocr/scan', authenticateToken, upload.single('receipt'), async (req, res) => {
+  try {
+    let imageBuffer = null;
 
-// 5. Get expenses (Supports: userId='all' for combined, userId='me' for current user, or userId=<id> for specific user)
+    if (req.file && req.file.buffer) {
+      imageBuffer = req.file.buffer;
+    } else if (req.body && req.body.imageBase64) {
+      const base64Data = req.body.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      imageBuffer = Buffer.from(base64Data, 'base64');
+    }
+
+    if (!imageBuffer) {
+      return res.status(400).json({ error: 'Please upload a receipt image or provide imageBase64' });
+    }
+
+    console.log(`[OCR] Analyzing bill image (${Math.round(imageBuffer.length / 1024)} KB) for @${req.user.username}...`);
+
+    // Run Tesseract OCR in English
+    const { data: { text, confidence } } = await Tesseract.recognize(imageBuffer, 'eng');
+    console.log(`[OCR] Recognition finished (${Math.round(confidence)}% confidence). Extracting receipt data...`);
+
+    // Parse extracted text into structured fields
+    const extracted = parseReceiptText(text);
+    extracted.confidence = Math.round(confidence);
+
+    console.log(`[OCR] Extracted: "${extracted.title}" - $${extracted.amount} (${extracted.category})`);
+
+    // If autoSave flag is set to true, automatically record directly to database!
+    let savedExpense = null;
+    if (req.body && (req.body.autoSave === 'true' || req.body.autoSave === true) && extracted.amount > 0) {
+      const notes = `OCR Scanned Receipt${extracted.confidence ? ` (${extracted.confidence}% confidence)` : ''}`;
+      const stmt = db.prepare(`
+        INSERT INTO expenses (user_id, title, amount, category, date, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const result = stmt.run(req.user.id, extracted.title, extracted.amount, extracted.category, extracted.date, notes);
+      savedExpense = db.prepare(`
+        SELECT expenses.*, users.username, users.full_name, users.avatar_color
+        FROM expenses
+        LEFT JOIN users ON expenses.user_id = users.id
+        WHERE expenses.id = ?
+      `).get(Number(result.lastInsertRowid));
+      console.log(`[OCR] Auto-saved expense #${savedExpense.id} for @${req.user.username}`);
+    }
+
+    res.json({
+      success: true,
+      extracted,
+      savedExpense,
+      autoSaved: !!savedExpense
+    });
+  } catch (err) {
+    console.error('OCR Processing error:', err);
+    res.status(500).json({ error: 'Failed to process receipt image: ' + err.message });
+  }
+});
+
+// --- EXPENSES ROUTES (Combined & Organized by User) ---
+
+// 6. Get expenses
 app.get('/api/expenses', authenticateToken, (req, res) => {
   try {
     const { category, search, month, userId } = req.query;
@@ -291,7 +362,6 @@ app.get('/api/expenses', authenticateToken, (req, res) => {
     `;
     const params = [];
 
-    // Filter by user if requested (defaults to 'all' for combined view, or 'me' for personal view)
     if (userId && userId === 'me') {
       sql += ' AND expenses.user_id = ?';
       params.push(req.user.id);
@@ -324,7 +394,7 @@ app.get('/api/expenses', authenticateToken, (req, res) => {
   }
 });
 
-// 6. Add new expense
+// 7. Add new expense
 app.post('/api/expenses', authenticateToken, (req, res) => {
   try {
     const { title, amount, category, date, notes } = req.body;
@@ -365,7 +435,7 @@ app.post('/api/expenses', authenticateToken, (req, res) => {
   }
 });
 
-// 7. Delete expense (Only creator or admin can delete)
+// 8. Delete expense
 app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -373,7 +443,6 @@ app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Invalid ID' });
     }
 
-    // Admins can delete any, standard users can delete their own
     let stmt;
     let result;
     if (req.user.username === 'admin') {
@@ -395,7 +464,7 @@ app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
   }
 });
 
-// 8. Get summary & analytics (Combined & User-Organized)
+// 9. Get summary & analytics
 app.get('/api/summary', authenticateToken, (req, res) => {
   try {
     const { userId, month } = req.query;
@@ -413,28 +482,24 @@ app.get('/api/summary', authenticateToken, (req, res) => {
       filterParams.push(parseInt(userId, 10));
     }
 
-    // Filtered or Combined total
     const totalRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count 
       FROM expenses 
       WHERE 1=1 ${userFilter}
     `).get(...filterParams);
 
-    // Current month total
     const monthRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count 
       FROM expenses 
       WHERE strftime("%Y-%m", date) = ? ${userFilter}
     `).get(currentMonth, ...filterParams);
 
-    // Today total
     const todayRow = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count 
       FROM expenses 
       WHERE date = ? ${userFilter}
     `).get(today, ...filterParams);
 
-    // Category breakdown
     const categoryRows = db.prepare(`
       SELECT category, COALESCE(SUM(amount), 0) as total, COUNT(*) as count 
       FROM expenses 
@@ -451,7 +516,6 @@ app.get('/api/summary', authenticateToken, (req, res) => {
       percentage: total > 0 ? Math.round((row.total / total) * 100) : 0
     }));
 
-    // User breakdown (ALWAYS ORGANIZED BY USER)
     const userBreakdownRows = db.prepare(`
       SELECT 
         users.id as user_id, 
@@ -477,7 +541,6 @@ app.get('/api/summary', authenticateToken, (req, res) => {
       percentage: grandTotal > 0 ? Math.round((u.total / grandTotal) * 100) : 0
     }));
 
-    // Recent 5 expenses with user info
     const recentRows = db.prepare(`
       SELECT 
         expenses.*, users.username, users.full_name, users.avatar_color
@@ -515,12 +578,13 @@ if (!fs.existsSync(publicDir)) {
 app.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalIpAddresses();
   console.log('\n=============================================================');
-  console.log('   EXPENSEHUB PRO • MULTIUSER LOCAL SERVER RUNNING');
+  console.log('   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.1.0)');
   console.log('=============================================================');
   console.log(`  > Local Machine:  http://localhost:${PORT}`);
   ips.forEach(ip => {
     console.log(`  > Wi-Fi / Mobile: http://${ip.address}:${PORT}`);
     console.log(`  > API Endpoint:   http://${ip.address}:${PORT}/api/expenses`);
+    console.log(`  > OCR Scanner:    http://${ip.address}:${PORT}/api/ocr/scan`);
   });
   console.log('  > Default Account: admin / admin123 (or register in app)');
   console.log('=============================================================\n');
