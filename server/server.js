@@ -305,17 +305,16 @@ app.post('/api/ocr/scan', authenticateToken, upload.single('receipt'), async (re
     const extracted = parseReceiptText(text);
     extracted.confidence = Math.round(confidence);
 
-    console.log(`[OCR] Extracted: "${extracted.title}" - $${extracted.amount} (${extracted.category})`);
+    console.log(`[OCR] Captured from bill: Store "${extracted.storeName}" | Amount: $${extracted.amount} | Date: ${extracted.date}`);
 
-    // If autoSave flag is set to true, automatically record directly to database!
+    // If autoSave flag is set to true, automatically record directly to database
     let savedExpense = null;
     if (req.body && (req.body.autoSave === 'true' || req.body.autoSave === true) && extracted.amount > 0) {
-      const notes = `OCR Scanned Receipt${extracted.confidence ? ` (${extracted.confidence}% confidence)` : ''}`;
       const stmt = db.prepare(`
         INSERT INTO expenses (user_id, title, amount, category, date, notes)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      const result = stmt.run(req.user.id, extracted.title, extracted.amount, extracted.category, extracted.date, notes);
+      const result = stmt.run(req.user.id, extracted.storeName, extracted.amount, 'General', extracted.date, '');
       savedExpense = db.prepare(`
         SELECT expenses.*, users.username, users.full_name, users.avatar_color
         FROM expenses
@@ -327,7 +326,13 @@ app.post('/api/ocr/scan', authenticateToken, upload.single('receipt'), async (re
 
     res.json({
       success: true,
-      extracted,
+      extracted: {
+        storeName: extracted.storeName,
+        title: extracted.storeName,
+        amount: extracted.amount,
+        date: extracted.date,
+        confidence: extracted.confidence
+      },
       savedExpense,
       autoSaved: !!savedExpense
     });

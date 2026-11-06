@@ -879,30 +879,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (data['success'] == true) {
           final extracted = data['extracted'];
           final double amt = (extracted['amount'] is num) ? (extracted['amount'] as num).toDouble() : 0.0;
-          final String title = extracted['title'] ?? 'Scanned Receipt';
-          final String cat = extracted['category'] ?? 'General';
-          final String dateStr = extracted['date'] ?? '';
-          final int conf = extracted['confidence'] ?? 0;
+          final String storeName = (extracted['storeName'] ?? extracted['title'] ?? '').toString().trim();
+          final String dateStr = (extracted['date'] ?? '').toString().trim();
 
+          // 1. Amount
           if (amt > 0) {
             _amountController.text = amt.toStringAsFixed(2);
           }
-          if (title.isNotEmpty) {
-            _titleController.text = title;
+          // 2. Store Name
+          if (storeName.isNotEmpty) {
+            _titleController.text = storeName;
           }
-          if (_categories.any((c) => c['name'] == cat)) {
-            _selectedCategory = cat;
-          }
+          // 3. Date
           if (dateStr.isNotEmpty) {
             final parsedDate = DateTime.tryParse(dateStr);
             if (parsedDate != null) _selectedDate = parsedDate;
           }
-          _notesController.text = 'OCR Scanned Receipt ($conf% match)';
+
+          // Category and Notes are intentionally kept untouched per configuration
 
           setState(() {
-            _ocrSuccessMsg = '✨ Extracted: $title (\$$amt) • $conf% confidence';
+            _ocrSuccessMsg = '✨ $storeName • \$${amt.toStringAsFixed(2)} • $dateStr';
           });
-          _showToast('Receipt scanned: \$$amt ($title)!');
+          _showToast('Captured: $storeName (\$${amt.toStringAsFixed(2)})');
         } else {
           _showToast(data['error'] ?? 'OCR could not parse receipt', isError: true);
         }
@@ -935,7 +934,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Capture receipt to auto-extract amount, merchant, and date.',
+                'Capture bill to extract store name, date, and amount.',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 18),
@@ -1289,11 +1288,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Smart Receipt Scanner',
+                              'Smart Bill Scanner',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                             Text(
-                              'Snap receipt or bill to auto-fill details',
+                              'Capture bill to extract store name, date & amount',
                               style: TextStyle(color: Colors.grey, fontSize: 11),
                             ),
                           ],

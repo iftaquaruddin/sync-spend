@@ -1,12 +1,144 @@
-// Receipt Text Parsing & Extraction Engine
+// SyncSpend • Intelligent Bill & Receipt Parser (Store Name, Date & Amount)
+
+/**
+ * Converts ALL CAPS or messy text to Title Case
+ */
+function toTitleCase(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      if (word.length <= 1) return word.toUpperCase();
+      // Keep acronyms like CVS, BP, BBQ uppercase
+      if (['cvs', 'bp', 'ups', 'usps', 'fedex', 'at&t', 'h&m'].includes(word)) {
+        return word.toUpperCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+/**
+ * Identifies OCR noise/garbage lines (random letters, isolated punctuation, crease marks)
+ */
+function isNoiseLine(line) {
+  if (!line || line.length < 3) return true;
+  const lettersOnly = line.replace(/[^a-zA-Z]/g, '');
+  if (lettersOnly.length < 3) return true;
+
+  const words = line.trim().split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return true;
+
+  // If majority of words are single characters (e.g. "4 3 i Tr 14 y 7 p"), it's an OCR visual artifact
+  const singleCharWords = words.filter(w => w.length === 1);
+  if (words.length >= 3 && (singleCharWords.length / words.length) > 0.4) {
+    return true;
+  }
+
+  // If ratio of alphanumeric characters is too low
+  const alphaNumCount = line.replace(/[^a-zA-Z0-9]/g, '').length;
+  if ((alphaNumCount / line.length) < 0.6) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Cleans extracted store name of store numbers, addresses, and common receipt header prefixes
+ */
+function cleanStoreName(name) {
+  if (!name) return '';
+  let cleaned = name.trim();
+
+  // Strip prefixes like "Welcome to", "Store:", "Thank you for shopping at"
+  cleaned = cleaned.replace(/^(welcome\s+to\s+|thank\s+you\s+for\s+shopping\s+at\s+|store\s*:\s*|merchant\s*:\s*)/i, '');
+
+  // Strip trailing store/terminal identifiers like "#1234", "Store 482", "No. 12"
+  cleaned = cleaned.replace(/\s*(#\s*\d+|store\s*#?\s*\d+|branch\s*#?\s*\d+|reg\s*#?\s*\d+|terminal\s*#?\s*\d+).*$/i, '');
+
+  // Strip non-name symbols
+  cleaned = cleaned.replace(/[^a-zA-Z0-9\s&'.-]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+  // If text is ALL CAPS, convert to clean Title Case
+  if (cleaned.length > 2 && cleaned === cleaned.toUpperCase()) {
+    cleaned = toTitleCase(cleaned);
+  }
+
+  return cleaned.slice(0, 50);
+}
+
+/**
+ * Normalizes date strings (MM/DD/YYYY, YYYY-MM-DD, Month DD YYYY) into standard ISO YYYY-MM-DD
+ */
+function normalizeDate(rawText) {
+  const currentYear = new Date().getFullYear();
+
+  // 1. Check for standard ISO format YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+  const isoMatch = rawText.match(/\b(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 2. Check for text month formats: "Nov 06, 2026", "November 6 2026", "06 Nov 2026", "6-Nov-2026"
+  const monthMap = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+  };
+  const textMonthRegex1 = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[.\s]+([0-3]?\d)[,\s]+(20\d{2}|\d{2})\b/i;
+  const tm1 = rawText.match(textMonthRegex1);
+  if (tm1) {
+    const m = monthMap[tm1[1].toLowerCase().slice(0, 3)];
+    const d = tm1[2].padStart(2, '0');
+    let y = tm1[3];
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m}-${d}`;
+  }
+
+  const textMonthRegex2 = /\b([0-3]?\d)[-\s]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-\s]+(20\d{2}|\d{2})\b/i;
+  const tm2 = rawText.match(textMonthRegex2);
+  if (tm2) {
+    const d = tm2[1].padStart(2, '0');
+    const m = monthMap[tm2[2].toLowerCase().slice(0, 3)];
+    let y = tm2[3];
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. Check for US format MM/DD/YYYY or MM/DD/YY
+  const usMatch = rawText.match(/\b(0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])[-/.](20\d{2}|\d{2})\b/);
+  if (usMatch) {
+    const m = usMatch[1].padStart(2, '0');
+    const d = usMatch[2].padStart(2, '0');
+    let y = usMatch[3];
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m}-${d}`;
+  }
+
+  // Fallback: today's date in local YYYY-MM-DD
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Extracts store name, date, and final total amount from receipt text
+ */
 function parseReceiptText(text) {
   if (!text || typeof text !== 'string') {
+    const today = new Date().toISOString().split('T')[0];
     return {
-      title: 'Scanned Expense',
+      storeName: 'Unknown Store',
+      title: 'Unknown Store',
       amount: 0.0,
-      category: 'General',
-      date: new Date().toISOString().split('T')[0],
-      rawText: ''
+      date: today,
+      confidence: 0
     };
   }
 
@@ -17,189 +149,138 @@ function parseReceiptText(text) {
 
   const rawText = lines.join('\n');
 
-  // 1. Merchant / Title Extraction
-  let title = '';
-  const knownMerchants = [
-    { name: 'Starbucks', category: 'Food & Dining' },
-    { name: 'McDonald\'s', category: 'Food & Dining' },
-    { name: 'Chipotle', category: 'Food & Dining' },
-    { name: 'Subway', category: 'Food & Dining' },
-    { name: 'Burger King', category: 'Food & Dining' },
-    { name: 'Dunkin', category: 'Food & Dining' },
-    { name: 'Walmart', category: 'Groceries' },
-    { name: 'Target', category: 'Shopping' },
-    { name: 'Costco', category: 'Groceries' },
-    { name: 'Trader Joe\'s', category: 'Groceries' },
-    { name: 'Whole Foods', category: 'Groceries' },
-    { name: 'Kroger', category: 'Groceries' },
-    { name: 'Aldi', category: 'Groceries' },
-    { name: 'Shell', category: 'Transport' },
-    { name: 'Chevron', category: 'Transport' },
-    { name: 'ExxonMobil', category: 'Transport' },
-    { name: 'BP', category: 'Transport' },
-    { name: 'Uber', category: 'Transport' },
-    { name: 'Lyft', category: 'Transport' },
-    { name: 'CVS Pharmacy', category: 'Health' },
-    { name: 'Walgreens', category: 'Health' },
-    { name: 'Best Buy', category: 'Shopping' },
-    { name: 'Apple Store', category: 'Shopping' },
-    { name: 'Home Depot', category: 'Shopping' },
-    { name: 'Amazon', category: 'Shopping' }
+  // ==========================================
+  // 1. STORE NAME EXTRACTION
+  // ==========================================
+  let storeName = '';
+
+  // Well-known store brands dictionary for instant high-confidence recognition
+  const popularStores = [
+    'Walmart', 'Target', 'Costco Wholesale', 'Costco', 'Trader Joe\'s', 'Whole Foods Market',
+    'Whole Foods', 'Kroger', 'Aldi', 'Safeway', 'Publix', 'HEB', 'Wegmans', 'Sam\'s Club',
+    'Starbucks', 'McDonald\'s', 'Subway', 'Chipotle', 'Dunkin', 'Burger King', 'Wendy\'s',
+    'Taco Bell', 'Panera Bread', 'Dominos', 'Pizza Hut', 'KFC', 'Popeyes', 'Chick-fil-A',
+    'Home Depot', 'Lowe\'s', 'Best Buy', 'Apple Store', 'Apple', 'IKEA', 'Walgreens', 'CVS Pharmacy',
+    'CVS', 'Dollar Tree', 'Dollar General', 'Seven-Eleven', '7-Eleven', 'Shell', 'Chevron',
+    'ExxonMobil', 'Exxon', 'Mobil', 'BP', 'Sunoco', 'Circle K', 'Speedway', 'Wawa',
+    'Uber', 'Lyft', 'Amazon', 'Shell Oil'
   ];
 
-  let detectedCategory = null;
-
-  // Check known merchants in raw text
-  for (const m of knownMerchants) {
-    const regex = new RegExp(`\\b${m.name.replace("'", "['’]?")}\\b`, 'i');
+  for (const store of popularStores) {
+    const escaped = store.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&').replace("'", "['’]?");
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
     if (regex.test(rawText)) {
-      title = m.name;
-      detectedCategory = m.category;
+      storeName = store;
       break;
     }
   }
 
-  // If no known merchant, pick the first prominent line that isn't date/address/phone
-  if (!title) {
-    for (let i = 0; i < Math.min(lines.length, 5); i++) {
+  // If not matched in dictionary, inspect the top 8 lines of the bill
+  if (!storeName) {
+    for (let i = 0; i < Math.min(lines.length, 8); i++) {
       const line = lines[i];
-      // Skip if looks like date, phone number, address, or receipt header
-      if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(line)) continue;
-      if (/^(tel|phone|fax|invoice|receipt|welcome|order|store|cashier|terminal)/i.test(line)) continue;
-      if (/^#|\d{3,}/.test(line) && line.length < 8) continue;
-      if (/^\$?\d+(\.\d{2})?$/.test(line)) continue;
 
-      // Clean line
-      const cleanLine = line.replace(/[^a-zA-Z0-9\s&'-]/g, '').trim();
-      if (cleanLine.length >= 3 && cleanLine.length <= 40) {
-        title = cleanLine;
+      // Skip lines that represent dates, telephone, website, addresses, or generic receipts headers
+      if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(line)) continue;
+      if (/(tel|phone|fax|invoice|receipt|welcome|order|cashier|terminal|register|tax id|trn|gst|hst)/i.test(line) && line.length < 25) continue;
+      if (/(www\.|\.com|\.net|\.org|http)/i.test(line)) continue;
+      if (/^\d+\s+[a-zA-Z]+\s+(st|ave|blvd|rd|dr|lane|way|ct|hwy|pkwy)/i.test(line)) continue; // address
+      if (/^[a-zA-Z\s]+,\s*[A-Z]{2}\s*\d{5}/i.test(line)) continue; // City, State Zip
+      if (/^\$?\d+(\.\d{2})?$/.test(line)) continue; // numbers only
+      if (isNoiseLine(line)) continue; // Skip OCR visual artifacts
+
+      // Filter characters
+      const candidate = line.replace(/[^a-zA-Z0-9\s&'.-]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+      if (candidate.length >= 3 && candidate.length <= 45 && /[a-zA-Z]/.test(candidate) && !isNoiseLine(candidate)) {
+        storeName = cleanStoreName(candidate);
         break;
       }
     }
   }
 
-  if (!title) {
-    title = 'Scanned Receipt';
+  if (!storeName) {
+    storeName = 'Store Receipt';
+  } else {
+    storeName = cleanStoreName(storeName);
   }
 
-  // 2. Amount Extraction
-  let amount = 0.0;
-  const amounts = [];
+  // ==========================================
+  // 2. AMOUNT EXTRACTION
+  // ==========================================
+  let totalAmount = 0.0;
+  const directTotalAmounts = [];
+  const secondaryAmounts = [];
 
-  // Look for total lines first: "TOTAL $12.34", "AMOUNT DUE 45.00", "BAL DUE: 9.99"
-  const totalRegexes = [
-    /(?:total|grand\s*total|amount\s*due|bal(?:ance)?\s*due|total\s*usd|net\s*total)[\s:]*[$€£]?\s*(\d+[.,]\d{2})\b/i,
-    /(?:total|amount)[\s\S]{0,15}?[$€£]?\s*(\d+[.,]\d{2})\b/i,
-    /[$€£]\s*(\d+[.,]\d{2})\b/
-  ];
+  // Patterns explicitly matching total lines:
+  // "TOTAL $45.20", "GRAND TOTAL 120.00", "BAL DUE 15.50", "AMOUNT DUE $10.00", "TTL: 25.00"
+  const totalKeywords = /(?:grand\s*total|total\s*usd|total\s*cad|net\s*total|amount\s*due|balance\s*due|bal\s*due|total\s*amount|final\s*total|\btotal\b|\bttl\b)/i;
+  const negativeKeywords = /(subtotal|sub\s*total|tax\b|sales\s*tax|hst|gst|pst|\bcash\b|tendered|change\s*due|\bchange\b|you\s*saved|savings|discount|item\s*count)/i;
 
   for (const line of lines) {
-    // Skip lines that indicate subtotal, tax, change, cash tender
-    if (/(subtotal|sub\s*total|tax\b|change\s*due|cash\s*tender|savings)/i.test(line) && !/grand\s*total/i.test(line)) {
+    // If line is explicitly subtotal, tax, cash tendered, or change, ignore for grand total
+    if (negativeKeywords.test(line) && !/grand\s*total/i.test(line)) {
       continue;
     }
 
-    for (const rgx of totalRegexes) {
-      const match = line.match(rgx);
-      if (match && match[1]) {
-        const val = parseFloat(match[1].replace(',', '.'));
-        if (!isNaN(val) && val > 0) {
-          amounts.push(val);
-          break;
+    if (totalKeywords.test(line)) {
+      // Find all currency numbers on this total line
+      const matches = line.matchAll(/[$€£]?\s*(\d+[.,]\d{2})\b/g);
+      for (const m of matches) {
+        const val = parseFloat(m[1].replace(',', '.'));
+        if (!isNaN(val) && val > 0 && val < 50000) {
+          directTotalAmounts.push(val);
+        }
+      }
+    } else {
+      // Collect general prices with currency symbol or standard decimal
+      const matches = line.matchAll(/[$€£]\s*(\d+[.,]\d{2})\b/g);
+      for (const m of matches) {
+        const val = parseFloat(m[1].replace(',', '.'));
+        if (!isNaN(val) && val > 0 && val < 50000) {
+          secondaryAmounts.push(val);
         }
       }
     }
   }
 
-  if (amounts.length > 0) {
-    // Pick the most likely total (frequently the largest in receipt summary lines)
-    amount = Math.max(...amounts);
+  if (directTotalAmounts.length > 0) {
+    // Explicit total line: select the final total amount
+    totalAmount = Math.max(...directTotalAmounts);
+  } else if (secondaryAmounts.length > 0) {
+    // Fallback to highest amount found on receipt
+    totalAmount = Math.max(...secondaryAmounts);
   } else {
-    // General fallback: scan any standalone money format \b\d+\.\d{2}\b
+    // Last resort fallback: any decimal number \d+\.\d{2}
     const genericMatches = rawText.match(/\b\d+\.\d{2}\b/g);
-    if (genericMatches && genericMatches.length > 0) {
-      const parsed = genericMatches.map(m => parseFloat(m)).filter(v => v > 0 && v < 10000);
-      if (parsed.length > 0) {
-        amount = Math.max(...parsed);
+    if (genericMatches) {
+      const candidates = genericMatches
+        .map(v => parseFloat(v))
+        .filter(v => v > 0 && v < 50000);
+      if (candidates.length > 0) {
+        totalAmount = Math.max(...candidates);
       }
     }
   }
 
-  // 3. Date Extraction
-  let extractedDate = '';
-  // Check for YYYY-MM-DD
-  const isoMatch = rawText.match(/\b(20\d{2})[-/.](0[1-9]|1[0-2])[-/.](0[1-9]|[12]\d|3[01])\b/);
-  if (isoMatch) {
-    extractedDate = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-  } else {
-    // Check for MM/DD/YYYY or MM/DD/YY
-    const usMatch = rawText.match(/\b(0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])[-/.](20\d{2}|\d{2})\b/);
-    if (usMatch) {
-      const m = usMatch[1].padStart(2, '0');
-      const d = usMatch[2].padStart(2, '0');
-      let y = usMatch[3];
-      if (y.length === 2) y = '20' + y;
-      extractedDate = `${y}-${m}-${d}`;
-    }
-  }
+  // ==========================================
+  // 3. DATE EXTRACTION
+  // ==========================================
+  const extractedDate = normalizeDate(rawText);
 
-  if (!extractedDate) {
-    extractedDate = new Date().toISOString().split('T')[0];
-  }
-
-  // 4. Category Classification
-  if (!detectedCategory) {
-    const textLower = rawText.toLowerCase();
-    const categoriesMap = [
-      {
-        cat: 'Food & Dining',
-        keywords: ['restaurant', 'cafe', 'coffee', 'bakery', 'pizza', 'burger', 'dining', 'bar', 'grill', 'deli', 'taco', 'breakfast', 'lunch', 'dinner', 'espresso', 'kitchen', 'bistro']
-      },
-      {
-        cat: 'Groceries',
-        keywords: ['supermarket', 'grocery', 'produce', 'market', 'mart', 'bakery', 'organic', 'foods', 'milk', 'bread', 'meat', 'fruit']
-      },
-      {
-        cat: 'Transport',
-        keywords: ['fuel', 'gas', 'oil', 'petrol', 'diesel', 'parking', 'uber', 'lyft', 'transit', 'subway', 'taxi', 'toll', 'auto', 'car wash']
-      },
-      {
-        cat: 'Shopping',
-        keywords: ['apparel', 'clothing', 'shoes', 'retail', 'electronics', 'fashion', 'hardware', 'book', 'mall', 'outlet', 'depot', 'store']
-      },
-      {
-        cat: 'Bills & Utilities',
-        keywords: ['utility', 'electric', 'water', 'energy', 'internet', 'broadband', 'telecom', 'mobile', 'bill', 'service fee', 'subscription']
-      },
-      {
-        cat: 'Entertainment',
-        keywords: ['cinema', 'movie', 'theatre', 'theater', 'ticket', 'concert', 'bowling', 'arcade', 'game', 'amusement']
-      },
-      {
-        cat: 'Health',
-        keywords: ['pharmacy', 'rx', 'drug', 'health', 'medical', 'clinic', 'dental', 'doctor', 'hospital', 'wellness', 'optical', 'care']
-      },
-      {
-        cat: 'Travel',
-        keywords: ['hotel', 'flight', 'airline', 'motel', 'resort', 'inn', 'stay', 'airfare', 'terminal', 'airport']
-      }
-    ];
-
-    for (const rule of categoriesMap) {
-      if (rule.keywords.some(kw => textLower.includes(kw))) {
-        detectedCategory = rule.cat;
-        break;
-      }
-    }
-  }
+  // Confidence calculation based purely on Store Name, Date, and Amount
+  let confidenceScore = 40;
+  if (storeName && storeName !== 'Store Receipt') confidenceScore += 25;
+  if (totalAmount > 0) confidenceScore += 25;
+  if (extractedDate) confidenceScore += 10;
 
   return {
-    title: title.slice(0, 50),
-    amount: parseFloat(amount.toFixed(2)),
-    category: detectedCategory || 'General',
+    storeName,
+    title: storeName, // Alias for backward compatibility
     date: extractedDate,
+    amount: parseFloat(totalAmount.toFixed(2)),
+    confidence: confidenceScore,
     rawText: rawText.slice(0, 500)
   };
 }
 
-module.exports = { parseReceiptText };
+module.exports = { parseReceiptText, normalizeDate, cleanStoreName };

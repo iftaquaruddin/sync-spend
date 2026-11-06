@@ -644,7 +644,7 @@
             <div class="ocr-icon">📸</div>
             <div class="ocr-text">
               <h4>Scan Receipt / Bill with OCR</h4>
-              <p>Take a picture to auto-extract amount, merchant, date & category</p>
+              <p>Take a picture to capture store name, date & amount</p>
             </div>
             <button type="button" class="ocr-btn">Scan</button>
           </div>
@@ -1145,15 +1145,14 @@
 
         if (res.ok && data.success) {
           const ex = data.extracted;
+          const storeName = ex.storeName || ex.title || '';
           if (ex.amount > 0) document.getElementById('amount').value = ex.amount.toFixed(2);
-          if (ex.title) document.getElementById('title').value = ex.title;
-          if (ex.category) document.getElementById('category').value = ex.category;
+          if (storeName) document.getElementById('title').value = storeName;
           if (ex.date) document.getElementById('date').value = ex.date;
-          document.getElementById('notes').value = `Scanned receipt${ex.confidence ? ' (' + ex.confidence + '% match)' : ''}`;
 
-          badgeText.innerText = `✨ Extracted: ${ex.title} ($${ex.amount}) • ${ex.confidence || 0}% match`;
+          badgeText.innerText = `✨ ${storeName} • $${ex.amount.toFixed(2)} • ${ex.date}`;
           badgeEl.style.display = 'flex';
-          showToast(`Receipt scanned: $${ex.amount} (${ex.title})!`);
+          showToast(`Captured: ${storeName} ($${ex.amount.toFixed(2)})`);
         } else {
           alert(data.error || 'Failed to scan receipt image');
         }
