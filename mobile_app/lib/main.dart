@@ -10,8 +10,38 @@ void main() {
   runApp(const ExpenseTrackerApp());
 }
 
-class ExpenseTrackerApp extends StatelessWidget {
+class ExpenseTrackerApp extends StatefulWidget {
   const ExpenseTrackerApp({super.key});
+
+  @override
+  State<ExpenseTrackerApp> createState() => _ExpenseTrackerAppState();
+}
+
+class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+  }
+
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isDark = prefs.getBool('is_dark_mode') ?? false;
+    setState(() {
+      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
+  void _toggleTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final newMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    await prefs.setBool('is_dark_mode', newMode == ThemeMode.dark);
+    setState(() {
+      _themeMode = newMode;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,8 +49,9 @@ class ExpenseTrackerApp extends StatelessWidget {
     const slateDark = Color(0xFF0F172A);
 
     return MaterialApp(
-      title: 'ExpenseHub Pro',
+      title: 'SyncSpend Pro',
       debugShowCheckedModeBanner: false,
+      themeMode: _themeMode,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
@@ -34,7 +65,7 @@ class ExpenseTrackerApp extends StatelessWidget {
           elevation: 0,
           color: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             side: const BorderSide(color: Color(0xFFE2E8F0)),
           ),
         ),
@@ -44,8 +75,9 @@ class ExpenseTrackerApp extends StatelessWidget {
           scrolledUnderElevation: 1,
           titleTextStyle: TextStyle(
             color: slateDark,
-            fontSize: 17,
+            fontSize: 18,
             fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
           ),
           iconTheme: IconThemeData(color: slateDark),
         ),
@@ -54,20 +86,70 @@ class ExpenseTrackerApp extends StatelessWidget {
           fillColor: const Color(0xFFF8FAFC),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: primary, width: 2),
           ),
         ),
       ),
-      home: const RootScreen(),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFF0B0F19),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4F46E5),
+          primary: const Color(0xFF6366F1),
+          surface: const Color(0xFF111827),
+          brightness: Brightness.dark,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: const Color(0xFF111827),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Color(0xFF1F2937)),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF111827),
+          elevation: 0,
+          scrolledUnderElevation: 1,
+          titleTextStyle: TextStyle(
+            color: Color(0xFFF8FAFC),
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+          iconTheme: IconThemeData(color: Color(0xFFF8FAFC)),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF1F2937),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF374151)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF374151)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+          ),
+        ),
+      ),
+      home: RootScreen(
+        isDarkMode: _themeMode == ThemeMode.dark,
+        onToggleTheme: _toggleTheme,
+      ),
     );
   }
 }
@@ -216,7 +298,14 @@ class CategoryStat {
 
 // Root Screen handling Auth & Main Dashboard
 class RootScreen extends StatefulWidget {
-  const RootScreen({super.key});
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
+
+  const RootScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onToggleTheme,
+  });
 
   @override
   State<RootScreen> createState() => _RootScreenState();
@@ -294,6 +383,8 @@ class _RootScreenState extends State<RootScreen> {
     if (_token == null || _currentUser == null) {
       return AuthScreen(
         serverUrl: _serverUrl,
+        isDarkMode: widget.isDarkMode,
+        onToggleTheme: widget.onToggleTheme,
         onLoginSuccess: _onLoginSuccess,
         onServerUrlChanged: _onServerUrlChanged,
       );
@@ -303,6 +394,8 @@ class _RootScreenState extends State<RootScreen> {
       serverUrl: _serverUrl,
       token: _token!,
       currentUser: _currentUser!,
+      isDarkMode: widget.isDarkMode,
+      onToggleTheme: widget.onToggleTheme,
       onLogout: _onLogout,
       onServerUrlChanged: _onServerUrlChanged,
     );
@@ -314,12 +407,16 @@ class _RootScreenState extends State<RootScreen> {
 // -------------------------------------------------------------
 class AuthScreen extends StatefulWidget {
   final String serverUrl;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
   final Function(String token, AuthUser user) onLoginSuccess;
   final Function(String newUrl) onServerUrlChanged;
 
   const AuthScreen({
     super.key,
     required this.serverUrl,
+    required this.isDarkMode,
+    required this.onToggleTheme,
     required this.onLoginSuccess,
     required this.onServerUrlChanged,
   });
@@ -422,8 +519,13 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ExpenseHub Pro'),
+        title: const Text('SyncSpend Pro'),
         actions: [
+          IconButton(
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            tooltip: 'Toggle Theme',
+            onPressed: widget.onToggleTheme,
+          ),
           IconButton(
             icon: const Icon(Icons.wifi),
             tooltip: 'Server Settings',
@@ -438,32 +540,35 @@ class _AuthScreenState extends State<AuthScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 76,
+                height: 76,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF4361EE), Color(0xFF3A0CA3)],
+                    colors: [Color(0xFF4361EE), Color(0xFF312E81)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF4361EE).withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 6),
+                      color: const Color(0xFF4361EE).withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
-                child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 38),
+                child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 40),
               ),
               const SizedBox(height: 20),
               const Text(
-                'ExpenseHub',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                'SyncSpend',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6),
               ),
               const SizedBox(height: 6),
               Text(
-                'Combined & User-Organized Expense Tracker',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                'Private Multi-User Expense Tracker & Bill Scanner',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 28),
 
@@ -613,6 +718,8 @@ class DashboardScreen extends StatefulWidget {
   final String serverUrl;
   final String token;
   final AuthUser currentUser;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
   final VoidCallback onLogout;
   final Function(String newUrl) onServerUrlChanged;
 
@@ -621,6 +728,8 @@ class DashboardScreen extends StatefulWidget {
     required this.serverUrl,
     required this.token,
     required this.currentUser,
+    required this.isDarkMode,
+    required this.onToggleTheme,
     required this.onLogout,
     required this.onServerUrlChanged,
   });
@@ -1060,6 +1169,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           IconButton(
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode, size: 20),
+            tooltip: 'Toggle Dark/Light Mode',
+            onPressed: widget.onToggleTheme,
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, size: 20, color: Colors.redAccent),
             onPressed: widget.onLogout,
             tooltip: 'Log Out',
@@ -1070,7 +1184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // Scope Switcher Bar (Combined vs Personal vs By User)
           Container(
-            color: Colors.white,
+            color: Theme.of(context).cardTheme.color ?? Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1096,7 +1210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         label: Text(u.fullName, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
                         selected: isSel,
-                        selectedColor: const Color(0xFF4361EE).withValues(alpha: 0.15),
+                        selectedColor: const Color(0xFF4361EE).withValues(alpha: 0.18),
                         checkmarkColor: const Color(0xFF4361EE),
                         onSelected: (_) => _setScope(u.userId.toString()),
                       ),
@@ -1106,7 +1220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
 
           // Body Views
           Expanded(

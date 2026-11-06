@@ -8,7 +8,7 @@ void main() {
     await tester.pumpWidget(const ExpenseTrackerApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('ExpenseHub'), findsOneWidget);
+    expect(find.text('SyncSpend'), findsOneWidget);
     expect(find.text('Sign In'), findsAtLeastNWidgets(1));
   });
 }
