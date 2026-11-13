@@ -52,3 +52,11 @@ mobile_app/android/.idea/
 # OCR Models / Tesseract trained data
 *.traineddata
 logs/
+
+# Backups and Personal Notes
+*.backup
+info.txt
+
+# Receipt Uploads (ignore uploaded images but keep directory)
+server/uploads/receipts/*
+!server/uploads/receipts/.gitkeep

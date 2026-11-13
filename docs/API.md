@@ -197,14 +197,127 @@ This document details all REST API endpoints available in the SyncSpend server.
   {
     "success": true,
     "message": "Receipt processed successfully",
+    "receiptImage": "/uploads/receipts/bill_1794599819209_d1rcu42.png",
     "extracted": {
+      "storeName": "Starbucks Coffee",
       "title": "Starbucks Coffee",
       "amount": 14.85,
-      "category": "Food & Dining",
       "date": "2026-11-05",
+      "receiptImage": "/uploads/receipts/bill_1794599819209_d1rcu42.png",
       "confidence": 88
     },
-    "autoSaved": false,
-    "rawTextSnippet": "STARBUCKS #1024\nDATE: 11/05/2026\nCARAMEL MACCHIATO 6.25\n..."
+    "autoSaved": false
+  }
+  ```
+
+### Static Bill Photo Access
+- **Method**: `GET`
+- **Endpoint**: `/uploads/receipts/:filename`
+- **Access**: Public / Authenticated (Served statically from `server/uploads/receipts/`)
+- **Headers**: Returns `Content-Type: image/jpeg` or `image/png` with `Cache-Control: max-age=86400`
+
+---
+
+## 6. Admin User Management Endpoints (Admin Only)
+
+All endpoints in this section require `role === 'admin'` or user `admin`.
+
+### Get All Users
+- **Method**: `GET`
+- **Endpoint**: `/api/admin/users`
+- **Access**: Admin only (`Bearer <token>`)
+- **Response `200 OK`**:
+  ```json
+  [
+    {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator",
+      "avatar_color": "#4361EE",
+      "role": "admin",
+      "created_at": "2026-11-05 10:00:00",
+      "expense_count": 8,
+      "total_spent": 128.50
+    },
+    {
+      "id": 2,
+      "username": "sarah",
+      "full_name": "Sarah Connor",
+      "avatar_color": "#10B981",
+      "role": "user",
+      "created_at": "2026-11-05 10:30:00",
+      "expense_count": 4,
+      "total_spent": 49.99
+    }
+  ]
+  ```
+
+### Create New User (Admin)
+- **Method**: `POST`
+- **Endpoint**: `/api/admin/users`
+- **Access**: Admin only (`Bearer <token>`)
+- **Request Body**:
+  ```json
+  {
+    "username": "alex",
+    "fullName": "Alex Rivera",
+    "password": "securepassword",
+    "role": "user",
+    "avatarColor": "#8B5CF6"
+  }
+  ```
+- **Response `201 Created`**:
+  ```json
+  {
+    "message": "User created successfully by administrator",
+    "user": {
+      "id": 3,
+      "username": "alex",
+      "fullName": "Alex Rivera",
+      "avatarColor": "#8B5CF6",
+      "role": "user"
+    }
+  }
+  ```
+
+### Delete User (Admin)
+- **Method**: `DELETE`
+- **Endpoint**: `/api/admin/users/:id`
+- **Access**: Admin only (`Bearer <token>`)
+- **Behavior**:
+  - Automatically cascades and deletes all expenses belonging to this user.
+  - Returns `400 Bad Request` if an administrator attempts to delete their own logged-in account.
+- **Response `200 OK`**:
+  ```json
+  {
+    "message": "User @alex and all their expenses were deleted successfully.",
+    "deletedUserId": 3
+  }
+  ```
+
+### Update User (Admin)
+- **Method**: `PUT`
+- **Endpoint**: `/api/admin/users/:id`
+- **Access**: Admin only (`Bearer <token>`)
+- **Request Body**:
+  ```json
+  {
+    "fullName": "Alex Rivera Jr.",
+    "role": "admin",
+    "avatarColor": "#EC4899",
+    "newPassword": "newoptionalpassword"
+  }
+  ```
+- **Response `200 OK`**:
+  ```json
+  {
+    "message": "User updated successfully",
+    "user": {
+      "id": 3,
+      "username": "alex",
+      "fullName": "Alex Rivera Jr.",
+      "avatarColor": "#EC4899",
+      "role": "admin"
+    }
   }
   ```

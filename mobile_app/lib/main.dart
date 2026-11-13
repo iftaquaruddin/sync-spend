@@ -160,13 +160,17 @@ class AuthUser {
   final String username;
   final String fullName;
   final String avatarColor;
+  final String role;
 
   AuthUser({
     required this.id,
     required this.username,
     required this.fullName,
     required this.avatarColor,
+    this.role = 'user',
   });
+
+  bool get isAdmin => role == 'admin' || username.toLowerCase() == 'admin';
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
@@ -174,6 +178,7 @@ class AuthUser {
       username: json['username'] ?? '',
       fullName: json['fullName'] ?? json['full_name'] ?? json['username'] ?? 'User',
       avatarColor: json['avatarColor'] ?? json['avatar_color'] ?? '#4361EE',
+      role: json['role'] ?? 'user',
     );
   }
 
@@ -182,7 +187,45 @@ class AuthUser {
         'username': username,
         'fullName': fullName,
         'avatarColor': avatarColor,
+        'role': role,
       };
+}
+
+// Admin User Management Model
+class AdminUser {
+  final int id;
+  final String username;
+  final String fullName;
+  final String avatarColor;
+  final String role;
+  final double totalSpent;
+  final int expenseCount;
+
+  AdminUser({
+    required this.id,
+    required this.username,
+    required this.fullName,
+    required this.avatarColor,
+    required this.role,
+    required this.totalSpent,
+    required this.expenseCount,
+  });
+
+  factory AdminUser.fromJson(Map<String, dynamic> json) {
+    return AdminUser(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      username: json['username'] ?? '',
+      fullName: json['full_name'] ?? json['fullName'] ?? json['username'] ?? '',
+      avatarColor: json['avatar_color'] ?? json['avatarColor'] ?? '#4361EE',
+      role: json['role'] ?? 'user',
+      totalSpent: (json['total_spent'] is num)
+          ? (json['total_spent'] as num).toDouble()
+          : (json['totalSpent'] is num ? (json['totalSpent'] as num).toDouble() : 0.0),
+      expenseCount: json['expense_count'] is int
+          ? json['expense_count']
+          : (json['expenseCount'] is int ? json['expenseCount'] : 0),
+    );
+  }
 }
 
 // User Spending Stats Model (Organized by User)
@@ -234,6 +277,7 @@ class Expense {
   final String username;
   final String fullName;
   final String avatarColor;
+  final String? receiptImage;
 
   Expense({
     this.id,
@@ -246,6 +290,7 @@ class Expense {
     this.username = '',
     this.fullName = '',
     this.avatarColor = '#4361EE',
+    this.receiptImage,
   });
 
   factory Expense.fromJson(Map<String, dynamic> json) {
@@ -260,6 +305,7 @@ class Expense {
       username: json['username'] ?? '',
       fullName: json['full_name'] ?? json['username'] ?? '',
       avatarColor: json['avatar_color'] ?? '#4361EE',
+      receiptImage: json['receipt_image'] ?? json['receiptImage'],
     );
   }
 
@@ -269,6 +315,7 @@ class Expense {
         'category': category,
         'date': date,
         'notes': notes,
+        if (receiptImage != null && receiptImage!.isNotEmpty) 'receiptImage': receiptImage,
       };
 }
 
@@ -770,6 +817,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // OCR Receipt Scanning State
   bool _isOcrScanning = false;
   String? _ocrSuccessMsg;
+  String? _attachedReceiptImage;
+
+  // Admin User Management State
+  List<AdminUser> _adminUsers = [];
+  bool _isLoadingAdminUsers = false;
 
   // Categories config
   final List<Map<String, dynamic>> _categories = [
@@ -803,7 +855,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .timeout(const Duration(seconds: 4));
       if (healthRes.statusCode == 200) {
         setState(() => _isOnline = true);
-        await Future.wait([_fetchUsers(), _fetchExpenses(), _fetchSummary()]);
+        final futures = <Future>[_fetchUsers(), _fetchExpenses(), _fetchSummary()];
+        if (widget.currentUser.isAdmin) {
+          futures.add(_fetchAdminUsers());
+        }
+        await Future.wait(futures);
       } else {
         setState(() => _isOnline = false);
       }
@@ -892,6 +948,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       category: _selectedCategory,
       date: DateFormat('yyyy-MM-dd').format(_selectedDate),
       notes: _notesController.text.trim(),
+      receiptImage: _attachedReceiptImage,
     );
 
     try {
@@ -906,7 +963,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _amountController.clear();
         _titleController.clear();
         _notesController.clear();
-        setState(() => _selectedDate = DateTime.now());
+        setState(() {
+          _selectedDate = DateTime.now();
+          _attachedReceiptImage = null;
+          _ocrSuccessMsg = null;
+        });
         await _refreshAll();
         setState(() => _currentIndex = 1); // Switch to history
       } else {
@@ -1005,10 +1066,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (parsedDate != null) _selectedDate = parsedDate;
           }
 
-          // Category and Notes are intentionally kept untouched per configuration
+          final String? receiptImg = (extracted['receiptImage'] ?? data['receiptImage'])?.toString();
 
           setState(() {
             _ocrSuccessMsg = '✨ $storeName • \$${amt.toStringAsFixed(2)} • $dateStr';
+            if (receiptImg != null && receiptImg.isNotEmpty) {
+              _attachedReceiptImage = receiptImg;
+            }
           });
           _showToast('Captured: $storeName (\$${amt.toStringAsFixed(2)})');
         } else {
@@ -1082,6 +1146,510 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _viewReceiptImage(Expense item) {
+    if (item.receiptImage == null || item.receiptImage!.isEmpty) return;
+    final imageUrl = item.receiptImage!.startsWith('http')
+        ? item.receiptImage!
+        : '${widget.serverUrl}${item.receiptImage}';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppBar(
+              title: Text(
+                item.title.isNotEmpty ? item.title : 'Bill Receipt',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: const Color(0xFF4361EE),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 420),
+              color: Colors.black,
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => const Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                          SizedBox(height: 8),
+                          Text('Could not load bill image from server', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${item.date} • \$${item.amount.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Close'),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _fetchAdminUsers() async {
+    if (!widget.currentUser.isAdmin) return;
+    setState(() => _isLoadingAdminUsers = true);
+    try {
+      final res = await http.get(
+        Uri.parse('${widget.serverUrl}/api/admin/users'),
+        headers: _authHeaders,
+      ).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        setState(() {
+          _adminUsers = list.map((u) => AdminUser.fromJson(u)).toList();
+        });
+      }
+    } catch (_) {}
+    finally {
+      if (mounted) setState(() => _isLoadingAdminUsers = false);
+    }
+  }
+
+  Future<void> _adminCreateUser(String username, String fullName, String password, String role, String avatarColor) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${widget.serverUrl}/api/admin/users'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'username': username,
+          'fullName': fullName,
+          'password': password,
+          'role': role,
+          'avatarColor': avatarColor,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 201) {
+        _showToast('User @$username created! ✨');
+        _fetchAdminUsers();
+        _refreshAll();
+      } else {
+        final data = jsonDecode(res.body);
+        _showToast(data['error'] ?? 'Failed to create user', isError: true);
+      }
+    } catch (_) {
+      _showToast('Network error creating user', isError: true);
+    }
+  }
+
+  Future<void> _adminDeleteUser(AdminUser u) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete User @${u.username}?'),
+        content: Text(
+          'Are you sure you want to delete user "${u.fullName.isNotEmpty ? u.fullName : u.username}"?\n\n'
+          'WARNING: All expenses belonging to this user will also be permanently deleted!',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete User', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final res = await http.delete(
+        Uri.parse('${widget.serverUrl}/api/admin/users/${u.id}'),
+        headers: _authHeaders,
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        _showToast('User @${u.username} deleted');
+        _fetchAdminUsers();
+        _refreshAll();
+      } else {
+        final data = jsonDecode(res.body);
+        _showToast(data['error'] ?? 'Failed to delete user', isError: true);
+      }
+    } catch (_) {
+      _showToast('Error deleting user', isError: true);
+    }
+  }
+
+  void _showCreateUserModal() {
+    final userCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    String selectedRole = 'user';
+    String selectedColor = '#4361EE';
+
+    final colors = ['#4361EE', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Create User (Admin)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: userCtrl,
+                decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.alternate_email)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('Role: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 10),
+                  ChoiceChip(
+                    label: const Text('User'),
+                    selected: selectedRole == 'user',
+                    onSelected: (val) {
+                      if (val) setModalState(() => selectedRole = 'user');
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Admin'),
+                    selected: selectedRole == 'admin',
+                    onSelected: (val) {
+                      if (val) setModalState(() => selectedRole = 'admin');
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Text('Avatar Color: ', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: colors.map((c) {
+                          final isSel = selectedColor == c;
+                          return GestureDetector(
+                            onTap: () => setModalState(() => selectedColor = c),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: _parseColor(c),
+                                shape: BoxShape.circle,
+                                border: isSel ? Border.all(color: Colors.black, width: 2.5) : null,
+                              ),
+                              child: isSel ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4361EE),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  final u = userCtrl.text.trim();
+                  final n = nameCtrl.text.trim();
+                  final p = passCtrl.text;
+                  if (u.isEmpty || n.isEmpty || p.isEmpty) {
+                    _showToast('Please fill all fields', isError: true);
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  _adminCreateUser(u, n, p, selectedRole, selectedColor);
+                },
+                child: const Text('Create User Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _fetchAdminUsers();
+        await _refreshAll();
+      },
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Admin Control Panel',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      'Full user CRUD & receipt management',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: _showCreateUserModal,
+                  icon: const Icon(Icons.person_add, size: 16),
+                  label: const Text('Add User'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4361EE),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardTheme.color ?? Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('TOTAL USERS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_adminUsers.length}',
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF4361EE)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardTheme.color ?? Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('STORAGE MODE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        SizedBox(height: 4),
+                        Text(
+                          'SQLite + Receipts',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Users & Roles',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 8),
+            if (_isLoadingAdminUsers && _adminUsers.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+            else if (_adminUsers.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No users found.')))
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _adminUsers.length,
+                itemBuilder: (ctx, i) {
+                  final u = _adminUsers[i];
+                  final isSelf = (u.id == widget.currentUser.id || u.username.toLowerCase() == widget.currentUser.username.toLowerCase());
+                  final userColor = _parseColor(u.avatarColor);
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: userColor,
+                            foregroundColor: Colors.white,
+                            radius: 20,
+                            child: Text(
+                              (u.fullName.isNotEmpty ? u.fullName : u.username)[0].toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        u.fullName.isNotEmpty ? u.fullName : u.username,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: u.role == 'admin'
+                                            ? Colors.red.withValues(alpha: 0.12)
+                                            : const Color(0xFF4361EE).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        u.role.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: u.role == 'admin' ? Colors.red : const Color(0xFF4361EE),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelf) ...[
+                                      const SizedBox(width: 4),
+                                      const Text('(You)', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '@${u.username} • ${u.expenseCount} expenses • \$${u.totalSpent.toStringAsFixed(2)} total',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelf)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text('Current Admin', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                            )
+                          else
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              tooltip: 'Delete User',
+                              onPressed: () => _adminDeleteUser(u),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -1231,6 +1799,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildHistoryTab(),
                 _buildUsersTab(),
                 _buildAnalyticsTab(),
+                if (widget.currentUser.isAdmin) _buildAdminTab(),
               ],
             ),
           ),
@@ -1240,29 +1809,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) {
           setState(() => _currentIndex = idx);
-          if (idx == 1 || idx == 2 || idx == 3) _refreshAll();
+          if (idx == 1 || idx == 2 || idx == 3 || idx == 4) _refreshAll();
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.add_circle_outline),
             selectedIcon: Icon(Icons.add_circle),
             label: 'Add',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Transactions',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.people_outline),
             selectedIcon: Icon(Icons.people),
             label: 'By User',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.pie_chart_outline),
             selectedIcon: Icon(Icons.pie_chart),
             label: 'Insights',
           ),
+          if (widget.currentUser.isAdmin)
+            const NavigationDestination(
+              icon: Icon(Icons.admin_panel_settings_outlined),
+              selectedIcon: Icon(Icons.admin_panel_settings),
+              label: 'Admin',
+            ),
         ],
       ),
     );
@@ -1465,6 +2040,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           GestureDetector(
                             onTap: () => setState(() => _ocrSuccessMsg = null),
                             child: const Icon(Icons.close, size: 14, color: Color(0xFF059669)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_attachedReceiptImage != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFC7D2FE)),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              '${widget.serverUrl}$_attachedReceiptImage',
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.receipt, color: Color(0xFF4361EE)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Bill Photo Saved', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E1B4B))),
+                                Text('Will link permanently to this record on server', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                            onPressed: () => setState(() => _attachedReceiptImage = null),
+                            tooltip: 'Remove Bill Image',
                           ),
                         ],
                       ),
@@ -1775,6 +2390,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (item.receiptImage != null && item.receiptImage!.isNotEmpty) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.receipt_long, size: 20, color: Color(0xFF4361EE)),
+                                  tooltip: 'View Bill Receipt',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _viewReceiptImage(item),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
                               Text(
                                 '\$${item.amount.toStringAsFixed(2)}',
                                 style: const TextStyle(

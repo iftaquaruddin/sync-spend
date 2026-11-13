@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2026-11-13
+
+### Added
+- **Full Administrator Control of Users**:
+  - Role-based authorization (`admin` vs `user`) with admin-protected endpoints (`/api/admin/users`).
+  - Administrator user management capabilities:
+    - View all registered users with their spend totals and transaction counts (`GET /api/admin/users`).
+    - Provision new user accounts with assigned username, full name, password, role, and avatar accent color (`POST /api/admin/users`).
+    - Delete user accounts with automatic cascading deletion of all associated expenses (`DELETE /api/admin/users/:id`).
+    - Edit user full name, role, avatar color, or reset password (`PUT /api/admin/users/:id`).
+    - Built-in self-deletion protection to guarantee the active admin account is never deleted.
+  - Web Dashboard: dedicated **Admin Control Panel** tab showing total user metrics, storage mode, and full user CRUD interface.
+  - Flutter Mobile App: dedicated **Admin** navigation destination with user management dashboard, "+ Add User" bottom sheet, and confirmation dialogs.
+- **Persistent Bill Photo Upload & Permanent Server Storage**:
+  - Automatic saving of receipt and bill images to disk on the local server (`server/uploads/receipts/bill_<timestamp>_<id>.<ext>`).
+  - Added `expenses.receipt_image` database column linking the expense directly to the stored receipt image path.
+  - Static file hosting (`/uploads/receipts/*`) with cross-origin caching.
+  - Web Dashboard:
+    - Attached bill preview chip in Add Expense form with instant thumbnail and remove option.
+    - Clickable `🧾 View Bill` pill on transaction cards opening an interactive lightbox modal with full-resolution link.
+  - Flutter Mobile App:
+    - Smart bill attachment preview chip with thumbnail upon OCR scan completion.
+    - Clickable `🧾` receipt button on transaction items opening a modal with pinch-to-zoom (`InteractiveViewer`), high-resolution rendering, and smooth loading indicators.
+- **Resilient Server Exception Handling**:
+  - Global `uncaughtException` and `unhandledRejection` guards to protect server uptime.
+  - Graceful fallback for OCR recognition errors so receipt images are always safely preserved even if text is unreadable or blurry.
+
 ## [v1.1.0] - 2026-11-05
 
 ### Added

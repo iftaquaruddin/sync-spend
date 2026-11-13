@@ -569,6 +569,156 @@
     .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(67, 97, 238, 0.4); }
     .btn-submit:active { transform: scale(0.98); }
 
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+      animation: scaleUp 0.25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-header h3 { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+    .modal-close-btn {
+      background: var(--border-subtle);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .modal-close-btn:hover { background: var(--border); color: var(--text); }
+
+    /* Bill Receipt Lightbox & Pills */
+    .receipt-lightbox-img {
+      width: 100%;
+      max-height: 58vh;
+      object-fit: contain;
+      border-radius: var(--radius-md);
+      background: #000;
+      border: 1px solid var(--border);
+    }
+    .btn-receipt-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      background: rgba(67, 97, 238, 0.1);
+      color: var(--primary);
+      border: 1px solid rgba(67, 97, 238, 0.25);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-receipt-pill:hover {
+      background: var(--primary);
+      color: white;
+      transform: translateY(-1px);
+    }
+    .receipt-preview-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(67, 97, 238, 0.08);
+      border: 1px solid rgba(67, 97, 238, 0.2);
+      border-radius: var(--radius-sm);
+      margin-top: 10px;
+      font-size: 0.8rem;
+    }
+    .receipt-preview-thumb {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Admin Management Badges & Rows */
+    .admin-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .admin-badge.badge-admin {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .admin-badge.badge-user {
+      background: rgba(67, 97, 238, 0.12);
+      color: var(--primary);
+      border: 1px solid rgba(67, 97, 238, 0.25);
+    }
+    .admin-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-bottom: 10px;
+    }
+    .admin-user-info { display: flex; align-items: center; gap: 12px; }
+    .admin-action-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .admin-action-btn.btn-danger { color: var(--danger); border-color: rgba(239, 68, 68, 0.3); }
+    .admin-action-btn.btn-danger:hover {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: white;
+    }
+
     /* User Breakdown Cards */
     .user-stat-card {
       display: flex;
@@ -825,6 +975,9 @@
         <button class="nav-tab" id="tab-btn-insights" onclick="switchDashboardTab('insights')">
           <span>📊</span> Insights
         </button>
+        <button class="nav-tab" id="tab-btn-admin" onclick="switchDashboardTab('admin')" style="display: none;">
+          <span>⚙️</span> Admin
+        </button>
       </div>
 
       <!-- Tab 1: Add Expense Form -->
@@ -851,6 +1004,16 @@
           <div class="ocr-success-badge" id="ocr-success-badge" style="display: none;">
             <span id="ocr-badge-text">✨ Extracted: Walmart ($26.60)</span>
             <button type="button" onclick="clearOcrBadge()" style="background:none;border:none;color:currentColor;cursor:pointer;font-weight:bold;margin-left:8px;">✕</button>
+          </div>
+          <div id="receipt-preview-container" style="display: none;" class="receipt-preview-chip">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img id="receipt-preview-thumb" class="receipt-preview-thumb" src="" alt="Bill preview">
+              <div>
+                <strong style="display:block; font-size:0.82rem; color:var(--text);">Receipt Photo Saved</strong>
+                <span style="font-size:0.73rem; color:var(--text-muted);">Permanently stored on server with expense</span>
+              </div>
+            </div>
+            <button type="button" onclick="removeAttachedReceipt()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:700; font-size:0.82rem;">Remove</button>
           </div>
         </div>
 
@@ -962,8 +1125,90 @@
         <div id="category-bars-list"></div>
       </div>
 
+      <!-- Tab 5: Admin User Management -->
+      <div id="subview-admin" class="card" style="display: none;">
+        <div class="card-title" style="margin-bottom: 8px;">
+          <div>
+            <span>Admin Control Panel</span>
+            <span style="display: block; font-size: 0.78rem; font-weight: 500; color: var(--text-muted); margin-top: 2px;">Full administrator privileges: create, manage & delete users</span>
+          </div>
+          <button type="button" onclick="openCreateUserModal()" style="background:var(--primary);color:white;border:none;padding:8px 14px;border-radius:var(--radius-sm);font-weight:700;font-size:0.82rem;cursor:pointer;">
+            ➕ Create User
+          </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; margin-top: 14px;">
+          <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px;">
+            <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Users</span>
+            <h3 id="admin-user-count" style="font-size:1.4rem; font-weight:800; color:var(--primary); margin-top:4px;">0</h3>
+          </div>
+          <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px;">
+            <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Bill Storage</span>
+            <h3 style="font-size:0.95rem; font-weight:800; color:var(--accent); margin-top:6px;">Server Disk 📁</h3>
+          </div>
+        </div>
+
+        <div id="admin-users-list"></div>
+      </div>
+
     </div>
 
+  </div>
+
+  <!-- Bill Image Lightbox Modal -->
+  <div id="receipt-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeReceiptModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-receipt-title">🧾 Bill Receipt</h3>
+        <button class="modal-close-btn" onclick="closeReceiptModal()">✕</button>
+      </div>
+      <div style="text-align: center; margin-bottom: 14px;">
+        <img id="modal-receipt-img" class="receipt-lightbox-img" src="" alt="Bill Receipt">
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Permanently stored on local server</span>
+        <a id="modal-receipt-link" href="#" target="_blank" style="color: var(--primary); font-size: 0.82rem; font-weight: 700; text-decoration: none;">🔍 Full Resolution</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User Modal (Admin) -->
+  <div id="create-user-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeCreateUserModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Create New User (Admin)</h3>
+        <button class="modal-close-btn" onclick="closeCreateUserModal()">✕</button>
+      </div>
+      <form id="create-user-form" onsubmit="handleCreateUserSubmit(event)">
+        <div class="form-group">
+          <label for="admin-new-username">Username</label>
+          <input type="text" id="admin-new-username" placeholder="e.g. sarah" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="admin-new-fullname">Full Name</label>
+          <input type="text" id="admin-new-fullname" placeholder="e.g. Sarah Miller" required>
+        </div>
+        <div class="form-group">
+          <label for="admin-new-password">Password</label>
+          <input type="password" id="admin-new-password" placeholder="At least 6 characters" required autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="admin-new-role">Role</label>
+          <select id="admin-new-role">
+            <option value="user">Regular User</option>
+            <option value="admin">Administrator (Full Control)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Avatar Color</label>
+          <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px;">
+            <input type="color" id="admin-new-avatar-color" value="#4361EE" style="border:none; width:40px; height:40px; border-radius:8px; cursor:pointer;">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Pick profile theme accent</span>
+          </div>
+        </div>
+        <button type="submit" class="btn-submit" style="margin-top: 14px;">Create User Account</button>
+      </form>
+    </div>
   </div>
 
   <div class="toast" id="toast">Expense recorded! ✨</div>
@@ -1052,7 +1297,7 @@
 
     // Switch dashboard tabs
     function switchDashboardTab(tabName) {
-      const tabs = ['add', 'history', 'users', 'insights'];
+      const tabs = ['add', 'history', 'users', 'insights', 'admin'];
       tabs.forEach(t => {
         const btn = document.getElementById(`tab-btn-${t}`);
         const view = document.getElementById(`subview-${t}`);
@@ -1061,6 +1306,9 @@
       });
       if (tabName === 'history' || tabName === 'users' || tabName === 'insights') {
         loadUserData();
+      }
+      if (tabName === 'admin') {
+        loadAdminUsers();
       }
     }
 
@@ -1146,6 +1394,10 @@
       userProfilePill.style.display = 'none';
     }
 
+    function checkAdminPrivilege() {
+      return currentUser && (currentUser.role === 'admin' || (currentUser.username && currentUser.username.toLowerCase() === 'admin'));
+    }
+
     function renderAuthenticated() {
       const stored = localStorage.getItem('user');
       if (stored) {
@@ -1158,6 +1410,11 @@
         if (currentUser.avatarColor) {
           navUserAvatar.style.backgroundColor = currentUser.avatarColor;
         }
+      }
+
+      const adminTabBtn = document.getElementById('tab-btn-admin');
+      if (adminTabBtn) {
+        adminTabBtn.style.display = checkAdminPrivilege() ? 'flex' : 'none';
       }
 
       authView.style.display = 'none';
@@ -1284,7 +1541,12 @@
               </div>
             </div>
           </div>
-          <div class="item-right">
+          <div class="item-right" style="display:flex; align-items:center; gap:8px;">
+            ${item.receipt_image ? `
+              <button class="btn-receipt-pill" onclick="openReceiptModal('${escapeHtml(item.receipt_image)}', '${escapeHtml(item.title)}')" title="View Bill Receipt">
+                🧾 View Bill
+              </button>
+            ` : ''}
             <span class="item-amount">$${parseFloat(item.amount).toFixed(2)}</span>
             <button class="item-delete" onclick="deleteExpense(${item.id})" title="Delete">🗑️</button>
           </div>
@@ -1370,7 +1632,21 @@
       renderTransactions(filtered);
     }
 
-    // OCR Receipt Upload Handler (Store name, Date & Amount)
+    // OCR Receipt Upload Handler & Bill Storage
+    let currentReceiptImage = '';
+
+    function removeAttachedReceipt() {
+      currentReceiptImage = '';
+      const preview = document.getElementById('receipt-preview-container');
+      if (preview) preview.style.display = 'none';
+      const thumb = document.getElementById('receipt-preview-thumb');
+      if (thumb) thumb.src = '';
+    }
+
+    function clearOcrBadge() {
+      document.getElementById('ocr-success-badge').style.display = 'none';
+    }
+
     async function handleReceiptUpload(input) {
       if (!input.files || input.files.length === 0) return;
       const file = input.files[0];
@@ -1402,6 +1678,12 @@
           if (storeName) document.getElementById('title').value = storeName;
           if (ex.date) document.getElementById('date').value = ex.date;
 
+          currentReceiptImage = data.receiptImage || (ex && ex.receiptImage) || '';
+          if (currentReceiptImage) {
+            document.getElementById('receipt-preview-thumb').src = currentReceiptImage;
+            document.getElementById('receipt-preview-container').style.display = 'flex';
+          }
+
           badgeText.innerText = `✨ ${storeName} • $${ex.amount.toFixed(2)} • ${ex.date}`;
           badgeEl.style.display = 'flex';
           showToast(`Captured: ${storeName} ($${ex.amount.toFixed(2)})`);
@@ -1416,8 +1698,130 @@
       }
     }
 
-    function clearOcrBadge() {
-      document.getElementById('ocr-success-badge').style.display = 'none';
+    // Bill Lightbox Modal
+    function openReceiptModal(imageUrl, title) {
+      document.getElementById('modal-receipt-img').src = imageUrl;
+      document.getElementById('modal-receipt-title').innerText = `🧾 ${title || 'Bill Receipt'}`;
+      const link = document.getElementById('modal-receipt-link');
+      link.href = imageUrl;
+      document.getElementById('receipt-modal').style.display = 'flex';
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receipt-modal').style.display = 'none';
+      document.getElementById('modal-receipt-img').src = '';
+    }
+
+    // Admin User Management
+    function openCreateUserModal() {
+      document.getElementById('create-user-form').reset();
+      document.getElementById('admin-new-avatar-color').value = '#4361EE';
+      document.getElementById('create-user-modal').style.display = 'flex';
+    }
+
+    function closeCreateUserModal() {
+      document.getElementById('create-user-modal').style.display = 'none';
+    }
+
+    async function handleCreateUserSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById('admin-new-username').value.trim();
+      const fullName = document.getElementById('admin-new-fullname').value.trim();
+      const password = document.getElementById('admin-new-password').value;
+      const role = document.getElementById('admin-new-role').value;
+      const avatarColor = document.getElementById('admin-new-avatar-color').value;
+
+      try {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify({ username, fullName, password, role, avatarColor })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`User @${username} created! ✨`);
+          closeCreateUserModal();
+          loadAdminUsers();
+        } else {
+          alert(data.error || 'Failed to create user');
+        }
+      } catch (err) {
+        alert('Network error connecting to local server');
+      }
+    }
+
+    async function deleteUserByAdmin(userId, username) {
+      if (!confirm(`Are you sure you want to delete user "@${username}"?\n\nWARNING: All expenses belonging to this user will also be permanently deleted!`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`User @${username} deleted`);
+          loadAdminUsers();
+          loadUserData();
+        } else {
+          alert(data.error || 'Failed to delete user');
+        }
+      } catch (err) {
+        alert('Network error deleting user');
+      }
+    }
+
+    async function loadAdminUsers() {
+      if (!currentToken || !checkAdminPrivilege()) return;
+      try {
+        const res = await fetch('/api/admin/users', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          const users = await res.json();
+          document.getElementById('admin-user-count').innerText = users.length;
+          const list = document.getElementById('admin-users-list');
+          list.innerHTML = '';
+          users.forEach(u => {
+            const isSelf = currentUser && (currentUser.id === u.id || currentUser.username.toLowerCase() === u.username.toLowerCase());
+            const row = document.createElement('div');
+            row.className = 'admin-user-row';
+            row.innerHTML = `
+              <div class="admin-user-info">
+                <div class="user-stat-avatar" style="background:${u.avatar_color || '#4361EE'}; width:38px; height:38px; font-size:0.9rem;">
+                  ${(u.full_name || u.username || 'U')[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h4 style="font-size:0.92rem; font-weight:800; color:var(--text);">${escapeHtml(u.full_name || u.username)}</h4>
+                    <span class="admin-badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role || 'user'}</span>
+                    ${isSelf ? '<span style="font-size:0.7rem; color:var(--text-muted); font-weight:600;">(You)</span>' : ''}
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                    @${escapeHtml(u.username)} • ${u.expense_count || 0} expenses • $${parseFloat(u.total_spent || 0).toFixed(2)} total
+                  </div>
+                </div>
+              </div>
+              <div>
+                ${isSelf ? `
+                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; padding:4px 8px;">Current Admin</span>
+                ` : `
+                  <button class="admin-action-btn btn-danger" onclick="deleteUserByAdmin(${u.id}, '${escapeHtml(u.username)}')" title="Delete User">
+                    🗑️ Delete
+                  </button>
+                `}
+              </div>
+            `;
+            list.appendChild(row);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load admin users:', err);
+      }
     }
 
     // Record New Expense
@@ -1441,7 +1845,7 @@
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${currentToken}`
           },
-          body: JSON.stringify({ amount, title, category, date, notes })
+          body: JSON.stringify({ amount, title, category, date, notes, receiptImage: currentReceiptImage })
         });
 
         if (res.ok) {
@@ -1449,6 +1853,8 @@
           document.getElementById('amount').value = '';
           document.getElementById('title').value = '';
           document.getElementById('notes').value = '';
+          removeAttachedReceipt();
+          clearOcrBadge();
           await loadUserData();
           switchDashboardTab('history');
         } else {
