@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v1.3.0] - 2026-11-13
 
 ### Added
+- **Multi-Platform Docker & Docker Compose Containerization**:
+  - Production `Dockerfile` based on Node.js 22 LTS (`node:22-bookworm-slim`) with native SQLite and WebAssembly OCR support.
+  - Multi-architecture container compatibility: `linux/amd64` (Intel/AMD) and `linux/arm64` (Raspberry Pi, Apple Silicon, ARM cloud instances).
+  - Production-ready `docker-compose.yml` with named persistent storage (`syncspend_data`) for database and bill photo uploads.
+  - Non-root user execution (`node`) with `dumb-init` for PID 1 signal forwarding and zombie process reaping.
+  - Native zero-dependency health check using Node 22 built-in `fetch` API.
+  - Graceful shutdown handlers for `SIGTERM` and `SIGINT` to cleanly close SQLite transactions.
+  - Comprehensive platform deployment documentation ([docs/DOCKER.md](docs/DOCKER.md)) for Synology, QNAP, Unraid, TrueNAS, CasaOS, Linux VPS, and Cloud Containers.
 - **Record Editing by Admin & Record Creator**:
   - Full update capability for transaction records via `PUT /api/expenses/:id`.
   - Authorized access control: allows updating if user is the original creator or has administrative privileges.

@@ -20,8 +20,12 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 } // 15MB max image upload
 });
 
-// Receipts Upload Directory Setup
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+// Persistent Data & Uploads Setup (Supports Docker / Host environments)
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(DATA_DIR, 'uploads');
 const RECEIPTS_DIR = path.join(UPLOADS_DIR, 'receipts');
 if (!fs.existsSync(RECEIPTS_DIR)) {
   fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
@@ -35,7 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Database setup
-const dbPath = path.join(__dirname, 'expenses.db');
+const dbPath = process.env.DB_PATH || path.join(DATA_DIR, 'expenses.db');
 const db = new DatabaseSync(dbPath);
 
 // Enable foreign keys
@@ -106,8 +110,12 @@ if (!userCountRow || userCountRow.count === 0) {
 
 // Helper to get local Wi-Fi / LAN IP addresses
 function getLocalIpAddresses() {
-  const interfaces = os.networkInterfaces();
   const addresses = [];
+  if (process.env.SERVER_HOST || process.env.HOST_IP) {
+    const configuredHost = process.env.SERVER_HOST || process.env.HOST_IP;
+    addresses.push({ name: 'configured', address: configuredHost });
+  }
+  const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const net of interfaces[name]) {
       if (net.family === 'IPv4' && !net.internal) {
@@ -1026,7 +1034,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Start Server
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalIpAddresses();
   console.log('\n=============================================================');
   console.log('   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.3.0)');
@@ -1043,3 +1051,23 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('  > Default Account: admin / admin123 (or register in app)');
   console.log('=============================================================\n');
 });
+
+// Graceful shutdown handling for Docker, Podman & process managers
+function gracefulShutdown(signal) {
+  console.log(`\n[${signal}] Gracefully shutting down SyncSpend server...`);
+  server.close(() => {
+    try {
+      db.close();
+      console.log('[*] SQLite database connection closed.');
+    } catch (_) {}
+    console.log('[*] Server shut down cleanly.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('[!] Forced shutdown after timeout');
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

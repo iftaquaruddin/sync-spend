@@ -1,6 +1,7 @@
 # 💸 SyncSpend
 
 [![Release](https://img.shields.io/badge/Release-v1.3.0-4361EE.svg)](https://github.com)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docs/DOCKER.md)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Tesseract OCR](https://img.shields.io/badge/OCR-Tesseract.js-5c6bc0?logo=thealgorithms&logoColor=white)](https://github.com/naptha/tesseract.js)
@@ -14,6 +15,13 @@
 
 ## 🌟 Highlights
 
+- **🐳 Dockerized for Any Platform (v1.3.0)**:
+  - 1-command deployment via Docker & Docker Compose (`docker compose up -d`).
+  - Production-ready container based on Node.js 22 LTS with native SQLite and WebAssembly OCR.
+  - Multi-platform support: **Linux VPS, Raspberry Pi / ARM64, Synology NAS, QNAP, Unraid, TrueNAS, CasaOS, and Cloud Containers**.
+  - Persistent named volume (`syncspend_data`) keeping `expenses.db` and bill images safe across restarts and updates.
+  - Built-in zero-dependency health check and non-root execution (`node` user) for container security.
+  - See the complete [Docker Deployment Guide](docs/DOCKER.md).
 - **📊 Executive Financial Analytics & Interactive Charts (v1.3.0)**:
   - **Dynamic Chart.js Visualizations**: Timeline trends (area charts), multi-user comparative bar charts, and category share donut charts.
   - **Timeframe Filtering**: Drill down by `7 Days`, `30 Days`, `This Year`, or `All Time`.
@@ -93,7 +101,17 @@
 
 ## 🚀 Quick Start Guide
 
-### 1. Clone & Start Local Server
+### Option A: Run with Docker (Recommended for any platform)
+```bash
+# 1-command launch with persistent storage & auto-restart
+docker compose up -d
+
+# View live container logs
+docker compose logs -f
+```
+See [Docker Deployment Guide](docs/DOCKER.md) for Synology, Unraid, TrueNAS, Raspberry Pi, and VPS setup.
+
+### Option B: Run with Node.js on Local Machine
 ```bash
 # Start server using the Windows batch launcher
 start-server.bat
@@ -107,7 +125,8 @@ npm start
 The server displays your machine's Wi-Fi IP address:
 ```
 =============================================================
-   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.2.0)
+   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.3.0)
+   [+] Record Editing by Admin & Owner | Executive Analytics
    [+] Full Admin Control of Users & Persistent Bill Storage
 =============================================================
   > Local Machine:  http://localhost:3000
