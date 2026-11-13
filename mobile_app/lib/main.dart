@@ -803,6 +803,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _todaySpent = 0.0;
   int _totalCount = 0;
 
+  // Analytics & Charts State
+  String _analyticsTimeframe = 'month'; // 'week', 'month', 'year', 'all'
+  double _analyticsPeriodTotal = 0.0;
+  int _analyticsPeriodCount = 0;
+
   // Controllers for Add Tab
   final _amountController = TextEditingController();
   final _titleController = TextEditingController();
@@ -855,7 +860,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .timeout(const Duration(seconds: 4));
       if (healthRes.statusCode == 200) {
         setState(() => _isOnline = true);
-        final futures = <Future>[_fetchUsers(), _fetchExpenses(), _fetchSummary()];
+        final futures = <Future>[_fetchUsers(), _fetchExpenses(), _fetchSummary(), _fetchChartsData()];
         if (widget.currentUser.isAdmin) {
           futures.add(_fetchAdminUsers());
         }
@@ -920,6 +925,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _usersList = userList.map((j) => UserStat.fromJson(j)).toList();
           }
         });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchChartsData() async {
+    try {
+      final res = await http
+          .get(Uri.parse('${widget.serverUrl}/api/charts?timeframe=$_analyticsTimeframe&userId=$_currentScope'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> catList = data['byCategory'] ?? [];
+        if (mounted) {
+          setState(() {
+            _analyticsPeriodTotal = (data['totalSpent'] is num) ? (data['totalSpent'] as num).toDouble() : 0.0;
+            _analyticsPeriodCount = (data['totalCount'] is int) ? (data['totalCount'] as int) : 0;
+            _categoryStats = catList.map((j) => CategoryStat.fromJson(j)).toList();
+          });
+        }
       }
     } catch (_) {}
   }
@@ -992,6 +1016,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (_) {
       _showToast('Error deleting expense', isError: true);
+    }
+  }
+
+  Future<void> _updateExpense({
+    required int id,
+    required String title,
+    required double amount,
+    required String category,
+    required String date,
+    required String notes,
+    String? receiptImage,
+  }) async {
+    try {
+      final res = await http.put(
+        Uri.parse('${widget.serverUrl}/api/expenses/$id'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'title': title,
+          'amount': amount,
+          'category': category,
+          'date': date,
+          'notes': notes,
+          'receiptImage': receiptImage ?? '',
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200) {
+        _showToast('Expense updated! ✏️');
+        _refreshAll();
+      } else {
+        final body = jsonDecode(res.body);
+        _showToast(body['error'] ?? 'Failed to update expense', isError: true);
+      }
+    } catch (e) {
+      _showToast('Error updating expense', isError: true);
     }
   }
 
@@ -2398,7 +2457,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   constraints: const BoxConstraints(),
                                   onPressed: () => _viewReceiptImage(item),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                               ],
                               Text(
                                 '\$${item.amount.toStringAsFixed(2)}',
@@ -2408,14 +2467,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   color: Color(0xFF0F172A),
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
-                                onPressed: () {
-                                  if (item.id != null) {
-                                    _confirmDelete(item.id!);
-                                  }
-                                },
-                              ),
+                              if (widget.currentUser.id == item.userId ||
+                                  widget.currentUser.role == 'admin' ||
+                                  widget.currentUser.username.toLowerCase() == 'admin') ...[
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 19, color: Color(0xFF4361EE)),
+                                  tooltip: 'Edit Expense',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _openEditExpenseSheet(item),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 19, color: Colors.grey),
+                                  tooltip: 'Delete Expense',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () {
+                                    if (item.id != null) {
+                                      _confirmDelete(item.id!);
+                                    }
+                                  },
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -2424,6 +2498,201 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openEditExpenseSheet(Expense item) {
+    final titleCtrl = TextEditingController(text: item.title);
+    final amountCtrl = TextEditingController(text: item.amount.toStringAsFixed(2));
+    final notesCtrl = TextEditingController(text: item.notes);
+    String selectedCategory = item.category;
+    String selectedDate = item.date;
+    String? currentReceipt = item.receiptImage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '✏️ Edit Transaction',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount (\$)',
+                      prefixText: '\$ ',
+                      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Store / Merchant Name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _categories.any((c) => c['name'] == selectedCategory) ? selectedCategory : 'Other',
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: _categories.map((c) {
+                      return DropdownMenuItem<String>(
+                        value: c['name'] as String,
+                        child: Row(
+                          children: [
+                            Icon(c['icon'] as IconData, size: 18, color: c['color'] as Color),
+                            const SizedBox(width: 8),
+                            Text(c['name'] as String),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setModalState(() => selectedCategory = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.tryParse(selectedDate) ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
+                      );
+                      if (picked != null) {
+                        setModalState(() {
+                          selectedDate = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Date: $selectedDate', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          const Icon(Icons.calendar_today, size: 18, color: Color(0xFF4361EE)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Notes (optional)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  if (currentReceipt != null && currentReceipt!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.indigo.shade100),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.receipt_long, size: 18, color: Color(0xFF4361EE)),
+                              SizedBox(width: 6),
+                              Text('Receipt Photo Attached', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() => currentReceipt = '');
+                            },
+                            child: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4361EE),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                        final title = titleCtrl.text.trim();
+                        if (amt <= 0 || title.isEmpty) {
+                          _showToast('Please enter a valid title and amount', isError: true);
+                          return;
+                        }
+                        Navigator.pop(ctx);
+                        if (item.id != null) {
+                          _updateExpense(
+                            id: item.id!,
+                            title: title,
+                            amount: amt,
+                            category: selectedCategory,
+                            date: selectedDate,
+                            notes: notesCtrl.text.trim(),
+                            receiptImage: currentReceipt,
+                          );
+                        }
+                      },
+                      child: const Text(
+                        'Save Changes',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -2566,6 +2835,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // TAB 4: CATEGORY INSIGHTS VIEW
   // -------------------------------------------------------------
   Widget _buildAnalyticsTab() {
+    final avgAmount = _analyticsPeriodCount > 0 ? (_analyticsPeriodTotal / _analyticsPeriodCount) : 0.0;
+
     return RefreshIndicator(
       onRefresh: _refreshAll,
       child: SingleChildScrollView(
@@ -2577,7 +2848,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Category Spending',
+                  'Financial Analytics',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 ),
                 Text(
@@ -2586,18 +2857,115 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            // Timeframe Selector Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTimeframeChip('7 Days', 'week'),
+                  const SizedBox(width: 8),
+                  _buildTimeframeChip('30 Days', 'month'),
+                  const SizedBox(width: 8),
+                  _buildTimeframeChip('This Year', 'year'),
+                  const SizedBox(width: 8),
+                  _buildTimeframeChip('All Time', 'all'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            // Summary KPI Cards
+            Row(
+              children: [
+                Expanded(
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('PERIOD TOTAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('\$${_analyticsPeriodTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF4361EE))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('TRANSACTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('$_analyticsPeriodCount', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('AVG TRANSACTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('\$${avgAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Category Breakdown',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 8),
             if (_categoryStats.isEmpty)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Center(
-                    child: Text('No expenses recorded for this scope', style: TextStyle(color: Colors.grey.shade600)),
+                    child: Text('No expenses recorded for this timeframe', style: TextStyle(color: Colors.grey.shade600)),
                   ),
                 ),
               )
             else
               Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -2650,6 +3018,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTimeframeChip(String label, String tf) {
+    final isSelected = _analyticsTimeframe == tf;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: const Color(0xFF4361EE),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : const Color(0xFF0F172A),
+        fontWeight: FontWeight.bold,
+        fontSize: 12,
+      ),
+      backgroundColor: Colors.grey.shade100,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _analyticsTimeframe = tf);
+          _fetchChartsData();
+        }
+      },
     );
   }
 

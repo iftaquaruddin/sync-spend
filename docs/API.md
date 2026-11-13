@@ -148,6 +148,40 @@ This document details all REST API endpoints available in the SyncSpend server.
   }
   ```
 
+### Edit / Update Expense
+- **Method**: `PUT`
+- **Endpoint**: `/api/expenses/:id`
+- **Access**: Authenticated (Expense owner or `admin`)
+- **Request Body**:
+  ```json
+  {
+    "title": "Whole Foods Market",
+    "amount": 54.20,
+    "category": "Groceries",
+    "date": "2026-11-13",
+    "notes": "Weekly household groceries",
+    "receiptImage": "/uploads/receipts/bill_1763067584123_abc123.jpg"
+  }
+  ```
+- **Response `200 OK`**:
+  ```json
+  {
+    "message": "Expense updated successfully",
+    "expense": {
+      "id": 12,
+      "user_id": 2,
+      "title": "Whole Foods Market",
+      "amount": 54.2,
+      "category": "Groceries",
+      "date": "2026-11-13",
+      "notes": "Weekly household groceries",
+      "receipt_image": "/uploads/receipts/bill_1763067584123_abc123.jpg",
+      "username": "sarah",
+      "full_name": "Sarah Connor"
+    }
+  }
+  ```
+
 ### Delete Expense
 - **Method**: `DELETE`
 - **Endpoint**: `/api/expenses/:id`
@@ -168,6 +202,64 @@ This document details all REST API endpoints available in the SyncSpend server.
     "scope": "combined",
     "totalSpent": 94.49,
     "totalCount": 4,
+    "thisMonthSpent": 94.49,
+    "todaySpent": 20.00,
+    "byCategory": [
+      { "category": "Bills & Utilities", "total": 49.99, "count": 1, "percentage": 53 },
+      { "category": "Transport", "total": 20.00, "count": 1, "percentage": 21 }
+    ],
+    "byUser": [
+      { "userId": 2, "fullName": "Sarah Connor", "total": 49.99, "percentage": 53 },
+      { "userId": 1, "fullName": "Admin User", "total": 24.50, "percentage": 26 }
+    ]
+  }
+  ```
+
+### Dynamic Charts & Analytics
+- **Method**: `GET`
+- **Endpoint**: `/api/charts`
+- **Access**: Authenticated
+- **Query Parameters**:
+  - `timeframe`: `week` (7 days), `month` (30 days), `year` (calendar year), `all` (all time)
+  - `userId`: `all` (combined), `me` (current user), or specific user ID integer
+- **Response `200 OK`**:
+  ```json
+  {
+    "timeframe": "month",
+    "userId": "all",
+    "periodTotal": 248.50,
+    "totalSpent": 248.50,
+    "totalCount": 13,
+    "buckets": ["2026-11-05", "2026-11-12", "2026-11-13"],
+    "timeline": [
+      { "bucket": "2026-11-05", "total": 86.40, "count": 3 },
+      { "bucket": "2026-11-13", "total": 162.10, "count": 10 }
+    ],
+    "userSeries": [
+      {
+        "userId": 1,
+        "username": "admin",
+        "fullName": "Admin User",
+        "avatarColor": "#4361EE",
+        "data": [43.20, 0, 80.00]
+      }
+    ],
+    "byCategory": [
+      { "category": "Groceries", "total": 120.00, "count": 5, "percentage": 48 }
+    ],
+    "byUser": [
+      {
+        "userId": 1,
+        "username": "admin",
+        "fullName": "Admin User",
+        "avatarColor": "#4361EE",
+        "total": 123.20,
+        "count": 6,
+        "percentage": 50
+      }
+    ]
+  }
+  ```
     "thisMonthSpent": 94.49,
     "todaySpent": 20.00,
     "byCategory": [

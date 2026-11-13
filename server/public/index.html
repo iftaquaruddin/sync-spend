@@ -846,8 +846,125 @@
       border-color: rgba(255,255,255,0.2);
     }
 
+    .item-edit {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      margin-left: 6px;
+      transition: color 0.2s, transform 0.15s;
+      padding: 4px;
+    }
+    .item-edit:hover { color: var(--primary); transform: scale(1.15); }
+
+    /* Executive Analytics & Charts Styling */
+    .analytics-control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px;
+      margin-bottom: 18px;
+    }
+    .analytics-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .analytics-filter-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.6px;
+    }
+    .pill-group {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      gap: 2px;
+    }
+    .filter-pill {
+      background: none;
+      border: none;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .filter-pill:hover { color: var(--text); }
+    .filter-pill.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 8px rgba(67, 97, 238, 0.3);
+    }
+    .chart-select {
+      padding: 7px 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      cursor: pointer;
+    }
+    .chart-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .chart-kpi-card {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .kpi-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: block;
+    }
+    .kpi-val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-top: 4px;
+      letter-spacing: -0.4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-container-box {
+      position: relative;
+      width: 100%;
+      height: 320px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    @media (max-width: 600px) {
+      .chart-container-box { height: 260px; padding: 8px; }
+      .analytics-control-panel { flex-direction: column; align-items: flex-start; }
+    }
+
     @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -1116,13 +1233,96 @@
         <div id="users-breakdown-list"></div>
       </div>
 
-      <!-- Tab 4: Category Insights -->
+      <!-- Tab 4: Executive Analytics & Charts -->
       <div id="subview-insights" class="card" style="display: none;">
-        <div class="card-title">
-          <span>Category Insights</span>
-          <span id="insights-scope-label" style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">Combined</span>
+        <div class="card-title" style="margin-bottom: 8px;">
+          <div>
+            <span>Executive Financial Analytics</span>
+            <span style="display:block; font-size:0.78rem; font-weight:500; color:var(--text-muted); margin-top:2px;">
+              Visual spending trends, user comparisons & category distributions
+            </span>
+          </div>
+          <button onclick="loadChartAnalytics()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-weight:700;font-size:0.85rem;">↻ Refresh</button>
         </div>
-        <div id="category-bars-list"></div>
+
+        <!-- Controls: Timeframe, User Filter, Chart Mode -->
+        <div class="analytics-control-panel">
+          <!-- Timeframe Pills -->
+          <div class="analytics-filter-group">
+            <span class="analytics-filter-label">TIMEFRAME:</span>
+            <div class="pill-group" id="timeframe-pill-group">
+              <button type="button" class="filter-pill" id="btn-tf-week" onclick="setChartTimeframe('week')">7 Days</button>
+              <button type="button" class="filter-pill active" id="btn-tf-month" onclick="setChartTimeframe('month')">30 Days</button>
+              <button type="button" class="filter-pill" id="btn-tf-year" onclick="setChartTimeframe('year')">This Year</button>
+              <button type="button" class="filter-pill" id="btn-tf-all" onclick="setChartTimeframe('all')">All Time</button>
+            </div>
+          </div>
+
+          <!-- User Scope Dropdown -->
+          <div class="analytics-filter-group">
+            <span class="analytics-filter-label">USER SCOPE:</span>
+            <select id="chart-user-select" class="chart-select" onchange="setChartUser(this.value)">
+              <option value="all">👥 All Users Combined</option>
+              <option value="me">👤 Only My Spending</option>
+            </select>
+          </div>
+
+          <!-- Chart Mode Pills -->
+          <div class="analytics-filter-group">
+            <span class="analytics-filter-label">VIEW MODE:</span>
+            <div class="pill-group" id="chart-mode-pill-group">
+              <button type="button" class="filter-pill active" id="btn-mode-trend" onclick="setChartMode('trend')">📈 Timeline Trend</button>
+              <button type="button" class="filter-pill" id="btn-mode-compare" onclick="setChartMode('compare')">👥 Compare Users</button>
+              <button type="button" class="filter-pill" id="btn-mode-category" onclick="setChartMode('category')">🍩 Category Share</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary KPI Cards -->
+        <div class="chart-kpis" id="chart-kpis-grid">
+          <div class="chart-kpi-card">
+            <span class="kpi-label">Scope Total</span>
+            <h3 class="kpi-val" id="chart-kpi-total">$0.00</h3>
+          </div>
+          <div class="chart-kpi-card">
+            <span class="kpi-label">Transactions</span>
+            <h3 class="kpi-val" id="chart-kpi-count">0</h3>
+          </div>
+          <div class="chart-kpi-card">
+            <span class="kpi-label">Avg Transaction</span>
+            <h3 class="kpi-val" id="chart-kpi-avg">$0.00</h3>
+          </div>
+          <div class="chart-kpi-card">
+            <span class="kpi-label">Top Category</span>
+            <h3 class="kpi-val" id="chart-kpi-topcat" style="font-size: 1rem;">-</h3>
+          </div>
+        </div>
+
+        <!-- Main Chart.js Canvas -->
+        <div class="chart-container-box">
+          <canvas id="main-analytics-canvas"></canvas>
+        </div>
+
+        <!-- Secondary Breakdown Sections -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 22px;">
+          <!-- Category Progress Bars -->
+          <div>
+            <h4 style="font-size: 0.92rem; font-weight: 800; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <span>Category Breakdown</span>
+              <span id="chart-cat-count-label" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">0 categories</span>
+            </h4>
+            <div id="category-bars-list"></div>
+          </div>
+
+          <!-- User Spending Leaderboard -->
+          <div>
+            <h4 style="font-size: 0.92rem; font-weight: 800; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <span>User Contribution</span>
+              <span id="chart-user-count-label" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">0 members</span>
+            </h4>
+            <div id="chart-user-breakdown-list"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Tab 5: Admin User Management -->
@@ -1211,6 +1411,67 @@
     </div>
   </div>
 
+  <!-- Edit Expense Modal (Admin or Owner) -->
+  <div id="edit-expense-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target === this) closeEditExpenseModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>✏️ Edit Transaction</h3>
+        <button class="modal-close-btn" onclick="closeEditExpenseModal()">✕</button>
+      </div>
+      <form id="edit-expense-form" onsubmit="handleEditExpenseSubmit(event)">
+        <input type="hidden" id="edit-expense-id">
+        <div class="form-group">
+          <label for="edit-amount">Amount ($)</label>
+          <div class="amount-input-wrapper">
+            <span class="currency-symbol">$</span>
+            <input type="number" step="0.01" min="0.01" id="edit-amount" class="amount-input" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-title">Store Name / Merchant</label>
+          <input type="text" id="edit-title" required>
+        </div>
+        <div class="form-row" style="display: flex; gap: 12px;">
+          <div class="form-group" style="flex: 1;">
+            <label for="edit-category">Category</label>
+            <select id="edit-category">
+              <option value="Food & Dining">🍔 Food & Dining</option>
+              <option value="Groceries">🛒 Groceries</option>
+              <option value="Transport">🚗 Transport</option>
+              <option value="Shopping">🛍️ Shopping</option>
+              <option value="Bills & Utilities">💡 Bills & Utilities</option>
+              <option value="Entertainment">🎬 Entertainment</option>
+              <option value="Health">💊 Health</option>
+              <option value="Travel">✈️ Travel</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="edit-date">Date</label>
+            <input type="date" id="edit-date" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-notes">Notes (optional)</label>
+          <input type="text" id="edit-notes" placeholder="Invoice #, location, or details">
+        </div>
+        <div id="edit-receipt-container" style="display: none; margin-bottom: 16px;" class="receipt-preview-chip">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img id="edit-receipt-thumb" class="receipt-preview-thumb" src="" alt="Bill preview">
+            <div>
+              <strong style="display:block; font-size:0.82rem; color:var(--text);">Attached Bill Photo</strong>
+              <span style="font-size:0.73rem; color:var(--text-muted);">Permanently stored on server</span>
+            </div>
+          </div>
+          <button type="button" onclick="removeEditReceipt()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:700; font-size:0.82rem;">Remove Bill</button>
+        </div>
+        <button type="submit" class="btn-submit" id="btn-update-expense">
+          Update Transaction
+        </button>
+      </form>
+    </div>
+  </div>
+
   <div class="toast" id="toast">Expense recorded! ✨</div>
 
   <script>
@@ -1234,6 +1495,9 @@
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('theme', next);
       updateThemeButton(next);
+      if (analyticsChart && cachedChartData) {
+        renderChart(cachedChartData);
+      }
     }
 
     function updateThemeButton(theme) {
@@ -1304,8 +1568,11 @@
         if (btn) btn.classList.toggle('active', t === tabName);
         if (view) view.style.display = t === tabName ? 'block' : 'none';
       });
-      if (tabName === 'history' || tabName === 'users' || tabName === 'insights') {
+      if (tabName === 'history' || tabName === 'users') {
         loadUserData();
+      }
+      if (tabName === 'insights') {
+        loadChartAnalytics();
       }
       if (tabName === 'admin') {
         loadAdminUsers();
@@ -1522,6 +1789,10 @@
 
       expenses.forEach(item => {
         const cat = categoryConfig[item.category] || categoryConfig['Other'];
+        const isOwner = currentUser && (currentUser.id === item.user_id);
+        const isAdmin = checkAdminPrivilege();
+        const canEdit = isOwner || isAdmin;
+
         const li = document.createElement('li');
         li.className = 'expense-item';
         li.innerHTML = `
@@ -1548,7 +1819,12 @@
               </button>
             ` : ''}
             <span class="item-amount">$${parseFloat(item.amount).toFixed(2)}</span>
-            <button class="item-delete" onclick="deleteExpense(${item.id})" title="Delete">🗑️</button>
+            ${canEdit ? `
+              <button class="item-edit" onclick="openEditExpenseModal(${item.id})" title="Edit Transaction">✏️</button>
+            ` : ''}
+            ${canEdit ? `
+              <button class="item-delete" onclick="deleteExpense(${item.id})" title="Delete">🗑️</button>
+            ` : ''}
           </div>
         `;
         list.appendChild(li);
@@ -1888,6 +2164,394 @@
     function escapeHtml(str) {
       if (!str) return '';
       return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    }
+
+    // --- EDIT EXPENSE LOGIC (Admin & Record Creator) ---
+    let currentEditReceiptImage = '';
+
+    function openEditExpenseModal(id) {
+      const item = expensesData.find(e => e.id === id);
+      if (!item) return;
+
+      const isOwner = currentUser && (currentUser.id === item.user_id);
+      const isAdmin = checkAdminPrivilege();
+      if (!isOwner && !isAdmin) {
+        alert('Unauthorized: Only the creator or an administrator can edit this expense.');
+        return;
+      }
+
+      document.getElementById('edit-expense-id').value = item.id;
+      document.getElementById('edit-amount').value = parseFloat(item.amount).toFixed(2);
+      document.getElementById('edit-title').value = item.title;
+      document.getElementById('edit-category').value = item.category || 'Other';
+      document.getElementById('edit-date').value = item.date;
+      document.getElementById('edit-notes').value = item.notes || '';
+
+      currentEditReceiptImage = item.receipt_image || '';
+      const receiptContainer = document.getElementById('edit-receipt-container');
+      const receiptThumb = document.getElementById('edit-receipt-thumb');
+      if (currentEditReceiptImage) {
+        receiptThumb.src = currentEditReceiptImage;
+        receiptContainer.style.display = 'flex';
+      } else {
+        receiptContainer.style.display = 'none';
+        receiptThumb.src = '';
+      }
+
+      document.getElementById('edit-expense-modal').style.display = 'flex';
+    }
+
+    function closeEditExpenseModal() {
+      document.getElementById('edit-expense-modal').style.display = 'none';
+    }
+
+    function removeEditReceipt() {
+      currentEditReceiptImage = '';
+      document.getElementById('edit-receipt-container').style.display = 'none';
+      document.getElementById('edit-receipt-thumb').src = '';
+    }
+
+    async function handleEditExpenseSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-expense-id').value;
+      const amount = parseFloat(document.getElementById('edit-amount').value);
+      const title = document.getElementById('edit-title').value.trim();
+      const category = document.getElementById('edit-category').value;
+      const date = document.getElementById('edit-date').value;
+      const notes = document.getElementById('edit-notes').value.trim();
+
+      if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid amount.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/expenses/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify({
+            amount,
+            title,
+            category,
+            date,
+            notes,
+            receiptImage: currentEditReceiptImage
+          })
+        });
+
+        if (res.ok) {
+          showToast('Expense updated! ✏️');
+          closeEditExpenseModal();
+          await loadUserData();
+          const insightsView = document.getElementById('subview-insights');
+          if (insightsView && insightsView.style.display !== 'none') {
+            loadChartAnalytics();
+          }
+        } else {
+          const err = await res.json();
+          alert(err.error || 'Failed to update expense');
+        }
+      } catch (err) {
+        alert('Network error connecting to local server');
+      }
+    }
+
+    // --- EXECUTIVE ANALYTICS & INTERACTIVE CHARTS ---
+    let chartTimeframe = 'month';
+    let chartUser = 'all';
+    let chartMode = 'trend'; // 'trend', 'compare', 'category'
+    let analyticsChart = null;
+    let cachedChartData = null;
+
+    function setChartTimeframe(tf) {
+      chartTimeframe = tf;
+      ['week', 'month', 'year', 'all'].forEach(t => {
+        const el = document.getElementById(`btn-tf-${t}`);
+        if (el) el.classList.toggle('active', t === tf);
+      });
+      loadChartAnalytics();
+    }
+
+    function setChartUser(userId) {
+      chartUser = userId;
+      loadChartAnalytics();
+    }
+
+    function setChartMode(mode) {
+      chartMode = mode;
+      ['trend', 'compare', 'category'].forEach(m => {
+        const el = document.getElementById(`btn-mode-${m}`);
+        if (el) el.classList.toggle('active', m === mode);
+      });
+      if (cachedChartData) {
+        renderChart(cachedChartData);
+      } else {
+        loadChartAnalytics();
+      }
+    }
+
+    async function loadChartAnalytics() {
+      if (!currentToken) return;
+      try {
+        const res = await fetch(`/api/charts?timeframe=${chartTimeframe}&userId=${chartUser}`, {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (!res.ok) {
+          if (res.status === 401) logout();
+          return;
+        }
+        const data = await res.json();
+        cachedChartData = data;
+
+        // Populate User Select Dropdown with active options
+        const userSelect = document.getElementById('chart-user-select');
+        if (userSelect && data.byUser) {
+          const currentVal = userSelect.value;
+          userSelect.innerHTML = `
+            <option value="all">👥 All Users Combined</option>
+            <option value="me">👤 Only My Spending</option>
+          `;
+          data.byUser.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.userId;
+            opt.innerText = `👤 ${u.fullName || u.username} (@${u.username})`;
+            userSelect.appendChild(opt);
+          });
+          userSelect.value = currentVal;
+        }
+
+        // Render KPI Cards
+        const total = data.totalSpent || 0;
+        const count = data.totalCount || 0;
+        const avg = count > 0 ? (total / count) : 0;
+        const topCat = (data.byCategory && data.byCategory.length > 0) ? data.byCategory[0].category : 'None';
+
+        document.getElementById('chart-kpi-total').innerText = `$${total.toFixed(2)}`;
+        document.getElementById('chart-kpi-count').innerText = count;
+        document.getElementById('chart-kpi-avg').innerText = `$${avg.toFixed(2)}`;
+        document.getElementById('chart-kpi-topcat').innerText = topCat;
+
+        // Render Category Progress Bars
+        renderCategoryInsights(data.byCategory || []);
+        const catCountLabel = document.getElementById('chart-cat-count-label');
+        if (catCountLabel) catCountLabel.innerText = `${(data.byCategory || []).length} categories`;
+
+        // Render User Breakdown in Analytics Tab
+        renderAnalyticsUserLeaderboard(data.byUser || [], total);
+        const userCountLabel = document.getElementById('chart-user-count-label');
+        if (userCountLabel) userCountLabel.innerText = `${(data.byUser || []).length} members`;
+
+        // Render Chart
+        renderChart(data);
+      } catch (err) {
+        console.error('Failed to load chart analytics:', err);
+      }
+    }
+
+    function renderAnalyticsUserLeaderboard(users, total) {
+      const container = document.getElementById('chart-user-breakdown-list');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!users || users.length === 0) {
+        container.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:14px;font-size:0.85rem;">No member data in this timeframe.</p>`;
+        return;
+      }
+      users.forEach(u => {
+        const pct = total > 0 ? Math.round((u.total / total) * 100) : 0;
+        const card = document.createElement('div');
+        card.className = 'user-stat-card';
+        card.style.padding = '10px 14px';
+        card.style.marginBottom = '8px';
+        card.onclick = () => {
+          setChartUser(u.userId);
+          const sel = document.getElementById('chart-user-select');
+          if (sel) sel.value = u.userId;
+        };
+        card.innerHTML = `
+          <div class="user-stat-left" style="gap:10px;">
+            <div class="user-stat-avatar" style="background:${u.avatarColor || '#4361EE'}; width:34px; height:34px; font-size:0.85rem;">
+              ${(u.fullName || u.username)[0].toUpperCase()}
+            </div>
+            <div class="user-stat-info">
+              <h4 style="font-size:0.88rem;">${escapeHtml(u.fullName || u.username)}</h4>
+              <p style="font-size:0.72rem;">${u.count} tx • ${pct}% share</p>
+            </div>
+          </div>
+          <div class="user-stat-right">
+            <div class="user-stat-amount" style="font-size:0.98rem;">$${parseFloat(u.total).toFixed(2)}</div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderChart(data) {
+      const canvas = document.getElementById('main-analytics-canvas');
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (analyticsChart) {
+        analyticsChart.destroy();
+        analyticsChart = null;
+      }
+
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const textColor = isDark ? '#CBD5E1' : '#475569';
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)';
+
+      const timeline = data.timeline || [];
+      const userSeries = data.userSeries || [];
+      const categories = data.byCategory || [];
+
+      if (chartMode === 'trend') {
+        const labels = timeline.map(t => t.bucket);
+        const totals = timeline.map(t => t.total);
+
+        analyticsChart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: labels.length ? labels : ['No Data'],
+            datasets: [{
+              label: 'Spending ($)',
+              data: totals.length ? totals : [0],
+              borderColor: '#4361EE',
+              backgroundColor: isDark ? 'rgba(67, 97, 238, 0.28)' : 'rgba(67, 97, 238, 0.12)',
+              borderWidth: 2.5,
+              fill: true,
+              tension: 0.35,
+              pointBackgroundColor: '#4361EE',
+              pointBorderColor: isDark ? '#111827' : '#FFFFFF',
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 7
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: isDark ? '#1E293B' : '#0F172A',
+                titleColor: '#FFFFFF',
+                bodyColor: '#A5B4FC',
+                padding: 10,
+                cornerRadius: 8,
+                callbacks: {
+                  label: (ctx) => ` Spent: $${parseFloat(ctx.parsed.y).toFixed(2)}`
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { family: 'Plus Jakarta Sans', weight: '600' } }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: gridColor },
+                ticks: {
+                  color: textColor,
+                  font: { family: 'Plus Jakarta Sans', weight: '600' },
+                  callback: (val) => `$${val}`
+                }
+              }
+            }
+          }
+        });
+      } else if (chartMode === 'compare') {
+        const labels = data.timeline ? data.timeline.map(t => t.bucket) : [];
+        const datasets = userSeries.map((u) => ({
+          label: u.fullName || u.username,
+          data: u.data,
+          backgroundColor: (u.avatarColor || '#4361EE') + 'CC',
+          borderColor: u.avatarColor || '#4361EE',
+          borderWidth: 1.5,
+          borderRadius: 6
+        }));
+
+        analyticsChart = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: labels.length ? labels : ['No Activity'],
+            datasets: datasets.length ? datasets : [{ label: 'None', data: [0], backgroundColor: '#4361EE' }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: textColor, font: { family: 'Plus Jakarta Sans', weight: '700', size: 11 }, boxWidth: 12 }
+              },
+              tooltip: {
+                backgroundColor: isDark ? '#1E293B' : '#0F172A',
+                titleColor: '#FFFFFF',
+                padding: 10,
+                cornerRadius: 8,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.dataset.label}: $${parseFloat(ctx.parsed.y).toFixed(2)}`
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { family: 'Plus Jakarta Sans', weight: '600' } }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: gridColor },
+                ticks: {
+                  color: textColor,
+                  font: { family: 'Plus Jakarta Sans', weight: '600' },
+                  callback: (val) => `$${val}`
+                }
+              }
+            }
+          }
+        });
+      } else if (chartMode === 'category') {
+        const catLabels = categories.map(c => c.category);
+        const catTotals = categories.map(c => c.total);
+        const catColors = categories.map(c => (categoryConfig[c.category] || categoryConfig['Other']).color);
+
+        analyticsChart = new Chart(canvas, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels.length ? catLabels : ['No Expenses'],
+            datasets: [{
+              data: catTotals.length ? catTotals : [1],
+              backgroundColor: catColors.length ? catColors : ['#CBD5E1'],
+              borderWidth: 2,
+              borderColor: isDark ? '#111827' : '#FFFFFF'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: { color: textColor, font: { family: 'Plus Jakarta Sans', weight: '600', size: 11 }, boxWidth: 12, padding: 12 }
+              },
+              tooltip: {
+                backgroundColor: isDark ? '#1E293B' : '#0F172A',
+                titleColor: '#FFFFFF',
+                padding: 10,
+                cornerRadius: 8,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.label}: $${parseFloat(ctx.parsed).toFixed(2)}`
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     // Initialize

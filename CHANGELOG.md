@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.3.0] - 2026-11-13
+
+### Added
+- **Record Editing by Admin & Record Creator**:
+  - Full update capability for transaction records via `PUT /api/expenses/:id`.
+  - Authorized access control: allows updating if user is the original creator or has administrative privileges.
+  - Supports modifying store/merchant name, amount, category, transaction date, notes, and attached receipt bill image.
+  - Web Dashboard:
+    - Added inline `✏️` edit action button for authorized users on each transaction row.
+    - Sleek modal dialog for editing expenses with pre-filled inputs and receipt image management.
+  - Flutter Mobile App:
+    - Added edit icon button on transaction cards for owners and admins.
+    - Interactive bottom sheet for editing transactions with live date picker, category dropdown, amount editing, and receipt management.
+- **Executive Analytics & Interactive Charts**:
+  - Dynamic analytics endpoint (`GET /api/charts`) supporting customizable timeframes:
+    - `week` (last 7 days, daily buckets)
+    - `month` (last 30 days, daily buckets)
+    - `year` (current calendar year, monthly buckets)
+    - `all` (all-time history, monthly buckets)
+    - Flexible scope filtering by all users combined, current authenticated user, or specific user ID.
+    - Calculates period total, total transaction volume, average transaction size, and category share.
+    - Generates user-comparative timeline data series across all household/team members.
+  - Web Dashboard:
+    - Integrated **Chart.js** data visualization library.
+    - View Mode Switcher:
+      - **Timeline Trend**: Smooth area line chart tracking spending velocity over time with gradient fills.
+      - **User Comparison**: Multi-user comparative bar charts allowing admins to compare spending across members.
+      - **Category Share**: Modern donut chart highlighting category proportions.
+    - Timeframe selector pill buttons (`7 Days`, `30 Days`, `This Year`, `All Time`).
+    - User scope dropdown selector allowing admins to inspect any user or view all users combined.
+    - Real-time theme synchronization: chart gridlines, labels, and tooltips automatically update when toggling dark/light mode.
+    - Summary KPI cards showing period spend, volume, and average ticket size.
+  - Flutter Mobile App:
+    - Upgraded Analytics tab with timeframe filter chips (`7 Days`, `30 Days`, `This Year`, `All Time`).
+    - Summary KPI metrics (Period Total, Transactions, Average Transaction).
+    - Category spending distribution with progress bars and percentage share.
+- **FinTech Executive UI Polish**:
+  - Premium typography, elevation shadows, tabular numeric alignment (`font-variant-numeric: tabular-nums`), and glassmorphism app bar.
+  - Refined status badges, segmented pill controls, and responsive grid layouts.
+
 ## [v1.2.0] - 2026-11-13
 
 ### Added

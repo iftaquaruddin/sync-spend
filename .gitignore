@@ -60,3 +60,6 @@ info.txt
 # Receipt Uploads (ignore uploaded images but keep directory)
 server/uploads/receipts/*
 !server/uploads/receipts/.gitkeep
+
+# Temporary build scripts
+build_apk_temp.ps1

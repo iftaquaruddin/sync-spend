@@ -1,23 +1,33 @@
 # 💸 SyncSpend
 
-[![Release](https://img.shields.io/badge/Release-v1.2.0-4361EE.svg)](https://github.com)
+[![Release](https://img.shields.io/badge/Release-v1.3.0-4361EE.svg)](https://github.com)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Tesseract OCR](https://img.shields.io/badge/OCR-Tesseract.js-5c6bc0?logo=thealgorithms&logoColor=white)](https://github.com/naptha/tesseract.js)
+[![Chart.js](https://img.shields.io/badge/Charts-Chart.js-FF6384?logo=chartdotjs&logoColor=white)](https://www.chartjs.org)
 [![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **A privacy-first, multi-user expense tracking system that connects mobile phones (Android & iPhone) to your local server over Wi-Fi. Features full administrator user management, persistent bill photo storage with pinch-to-zoom viewer, intelligent OCR bill scanning, combined household/team totals, and individual member ledgers with no cloud accounts or subscriptions required.**
+> **A privacy-first, multi-user expense tracking system that connects mobile phones (Android & iPhone) to your local server over Wi-Fi. Features executive financial charts & data visualization, record editing by admins and creators, full administrator user management, persistent bill photo storage with pinch-to-zoom viewer, intelligent OCR bill scanning, combined household/team totals, and individual member ledgers with no cloud accounts or subscriptions required.**
 
 ---
 
 ## 🌟 Highlights
 
-- **👑 Full Administrator User Control (v1.2.0)**:
+- **📊 Executive Financial Analytics & Interactive Charts (v1.3.0)**:
+  - **Dynamic Chart.js Visualizations**: Timeline trends (area charts), multi-user comparative bar charts, and category share donut charts.
+  - **Timeframe Filtering**: Drill down by `7 Days`, `30 Days`, `This Year`, or `All Time`.
+  - **Admin Scope Drill-down**: Administrators can toggle between all users combined or any individual member with live comparative KPIs (Period Spend, Total Count, Average Transaction).
+  - **Dark / Light Synchronization**: Chart gridlines, labels, tooltips, and palettes automatically adapt to theme changes.
+- **✏️ Record Editing for Admins & Record Creators (v1.3.0)**:
+  - Both administrators and the actual user who created an expense can modify records (`PUT /api/expenses/:id`).
+  - Edit store/merchant name, amount, category, date, notes, and attached receipt photo.
+  - Interactive edit modals on Web and bottom sheets in Flutter with full validation.
+- **👑 Full Administrator User Control**:
   - Role-based authorization (`admin` vs `user`).
   - Administrators have full user lifecycle management: view spend statistics across all members, create new user accounts with credentials and roles, reset passwords, and delete user accounts (with automatic cascading expense removal and active self-deletion safety).
   - Dedicated **Admin** management panels in both the Web dashboard and Flutter mobile app.
-- **🧾 Persistent Bill Photo Storage & Lightbox Viewers (v1.2.0)**:
+- **🧾 Persistent Bill Photo Storage & Lightbox Viewers**:
   - When bills or receipts are scanned, photos are uploaded and permanently saved to the server disk (`/uploads/receipts/`) and linked to the expense.
   - **Web Dashboard**: Click `🧾 View Bill` to launch an interactive lightbox modal with a link to full-resolution images.
   - **Flutter Mobile App**: Click the `🧾` button on any transaction to open an `InteractiveViewer` with fluid pinch-to-zoom pan/zoom controls.

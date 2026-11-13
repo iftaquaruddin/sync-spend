@@ -477,7 +477,7 @@ app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
       appName: 'SyncSpend Pro Multiuser OCR Server',
-      version: '1.2.0',
+      version: '1.3.0',
       ocrEnabled: true,
       imageUploadsEnabled: true,
       serverTime: new Date().toISOString(),
@@ -711,6 +711,60 @@ app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
   }
 });
 
+// 8.1 Edit expense (Admin or Owner can edit)
+app.put('/api/expenses/:id', authenticateToken, (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid expense ID' });
+    }
+
+    const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const isAdm = req.user && (req.user.role === 'admin' || req.user.username?.toLowerCase() === 'admin');
+    const isOwner = req.user && req.user.id === existing.user_id;
+
+    if (!isAdm && !isOwner) {
+      return res.status(403).json({ error: 'Unauthorized: Only the creator or an administrator can edit this expense.' });
+    }
+
+    const { title, amount, category, date, notes, receiptImage, receipt_image } = req.body;
+
+    const updatedTitle = (title !== undefined && title.trim() !== '') ? title.trim() : existing.title;
+    const numericAmount = amount !== undefined ? parseFloat(amount) : existing.amount;
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'Valid positive amount is required' });
+    }
+    const updatedCategory = category || existing.category;
+    const updatedDate = date || existing.date;
+    const updatedNotes = notes !== undefined ? notes.trim() : existing.notes;
+    const updatedReceiptImage = (receiptImage !== undefined) ? receiptImage : (receipt_image !== undefined ? receipt_image : existing.receipt_image);
+
+    const stmt = db.prepare(`
+      UPDATE expenses 
+      SET title = ?, amount = ?, category = ?, date = ?, notes = ?, receipt_image = ?
+      WHERE id = ?
+    `);
+    stmt.run(updatedTitle, numericAmount, updatedCategory, updatedDate, updatedNotes, updatedReceiptImage || '', id);
+
+    const updated = db.prepare(`
+      SELECT expenses.*, users.username, users.full_name, users.avatar_color
+      FROM expenses
+      LEFT JOIN users ON expenses.user_id = users.id
+      WHERE expenses.id = ?
+    `).get(id);
+
+    console.log(`[~] Updated expense #${id} ("${updated.title}", $${updated.amount}) by @${req.user.username}${isAdm ? ' (Admin)' : ''}`);
+    res.json({ message: 'Expense updated successfully', expense: updated });
+  } catch (err) {
+    console.error('Error updating expense:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 9. Get summary & analytics
 app.get('/api/summary', authenticateToken, (req, res) => {
   try {
@@ -815,6 +869,148 @@ app.get('/api/summary', authenticateToken, (req, res) => {
   }
 });
 
+// 10. Dynamic Charts & Analytics Endpoint
+app.get('/api/charts', authenticateToken, (req, res) => {
+  try {
+    const { timeframe = 'month', userId = 'all' } = req.query;
+
+    let timeFilter = '';
+    const params = [];
+
+    if (timeframe === 'week') {
+      timeFilter = " AND date >= date('now', '-7 days', 'localtime')";
+    } else if (timeframe === 'month') {
+      timeFilter = " AND date >= date('now', '-30 days', 'localtime')";
+    } else if (timeframe === 'year') {
+      timeFilter = " AND strftime('%Y', date) = strftime('%Y', 'now', 'localtime')";
+    } else if (timeframe === 'current-month') {
+      timeFilter = " AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now', 'localtime')";
+    }
+
+    let userFilter = '';
+    if (userId === 'me') {
+      userFilter = ' AND expenses.user_id = ?';
+      params.push(req.user.id);
+    } else if (userId !== 'all' && !isNaN(parseInt(userId, 10))) {
+      userFilter = ' AND expenses.user_id = ?';
+      params.push(parseInt(userId, 10));
+    }
+
+    // 1. Grouping bucket: daily for week/month, monthly for year/all
+    const isMonthlyBucket = (timeframe === 'year' || timeframe === 'all');
+    const bucketExpr = isMonthlyBucket ? "strftime('%Y-%m', date)" : 'date';
+
+    // 2. Aggregate timeline trend
+    const timelineRows = db.prepare(`
+      SELECT 
+        ${bucketExpr} as bucket,
+        COALESCE(SUM(amount), 0) as total,
+        COUNT(*) as count
+      FROM expenses
+      WHERE 1=1 ${timeFilter} ${userFilter}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `).all(...params);
+
+    // 3. User comparative series (by user over time)
+    const allUsers = db.prepare('SELECT id, username, full_name, avatar_color FROM users ORDER BY id ASC').all();
+    const userBucketRows = db.prepare(`
+      SELECT 
+        ${bucketExpr} as bucket,
+        user_id,
+        COALESCE(SUM(amount), 0) as total
+      FROM expenses
+      WHERE 1=1 ${timeFilter}
+      GROUP BY bucket, user_id
+      ORDER BY bucket ASC
+    `).all();
+
+    // Map all unique buckets across timeline
+    const allBuckets = Array.from(new Set([
+      ...timelineRows.map(r => r.bucket),
+      ...userBucketRows.map(r => r.bucket)
+    ])).sort();
+
+    const userSeries = allUsers.map(u => {
+      const dataMap = {};
+      userBucketRows.filter(r => r.user_id === u.id).forEach(r => {
+        dataMap[r.bucket] = r.total;
+      });
+      return {
+        userId: u.id,
+        username: u.username,
+        fullName: u.full_name || u.username,
+        avatarColor: u.avatar_color || '#4361EE',
+        data: allBuckets.map(b => dataMap[b] || 0)
+      };
+    });
+
+    // 4. Category breakdown for this timeframe
+    const categoryRows = db.prepare(`
+      SELECT 
+        category,
+        COALESCE(SUM(amount), 0) as total,
+        COUNT(*) as count
+      FROM expenses
+      WHERE 1=1 ${timeFilter} ${userFilter}
+      GROUP BY category
+      ORDER BY total DESC
+    `).all(...params);
+
+    const periodTotal = timelineRows.reduce((sum, r) => sum + r.total, 0);
+    const categoryStats = categoryRows.map(r => ({
+      category: r.category,
+      total: r.total,
+      count: r.count,
+      percentage: periodTotal > 0 ? Math.round((r.total / periodTotal) * 100) : 0
+    }));
+
+    // 5. User breakdown for this timeframe
+    const userBreakdownRows = db.prepare(`
+      SELECT 
+        users.id as user_id,
+        users.username,
+        users.full_name,
+        users.avatar_color,
+        COALESCE(SUM(expenses.amount), 0) as total,
+        COUNT(expenses.id) as count
+      FROM users
+      LEFT JOIN expenses ON users.id = expenses.user_id ${timeFilter}
+      GROUP BY users.id
+      ORDER BY total DESC
+    `).all();
+
+    const usersGrandTotal = userBreakdownRows.reduce((sum, u) => sum + (u.total || 0), 0);
+    const userBreakdown = userBreakdownRows.map(u => ({
+      userId: u.user_id,
+      username: u.username,
+      fullName: u.full_name || u.username,
+      avatarColor: u.avatar_color || '#4361EE',
+      total: u.total,
+      count: u.count,
+      percentage: usersGrandTotal > 0 ? Math.round((u.total / usersGrandTotal) * 100) : 0
+    }));
+
+    const totalCount = timelineRows.reduce((sum, r) => sum + (r.count || 0), 0);
+
+    res.json({
+      timeframe,
+      userId,
+      periodTotal,
+      totalSpent: periodTotal,
+      totalCount,
+      buckets: allBuckets,
+      timeline: timelineRows.map(r => ({ bucket: r.bucket, total: r.total, count: r.count })),
+      userSeries,
+      byCategory: categoryStats,
+      byUser: userBreakdown
+    });
+  } catch (err) {
+    console.error('Error generating chart data:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Ensure public directory exists
 const publicDir = path.join(__dirname, 'public');
 if (!fs.existsSync(publicDir)) {
@@ -833,7 +1029,8 @@ process.on('unhandledRejection', (reason, promise) => {
 app.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalIpAddresses();
   console.log('\n=============================================================');
-  console.log('   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.2.0)');
+  console.log('   SYNCSPEND PRO • MULTIUSER OCR SERVER RUNNING (v1.3.0)');
+  console.log('   [+] Record Editing by Admin & Owner | Executive Analytics');
   console.log('   [+] Full Admin Control of Users & Persistent Bill Storage');
   console.log('=============================================================');
   console.log(`  > Local Machine:  http://localhost:${PORT}`);
